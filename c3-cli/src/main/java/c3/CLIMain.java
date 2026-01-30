@@ -17,8 +17,8 @@ import ay.tasks.AyTask;
 
 @QuarkusMain
 @TopCommand
-@CommandLine.Command(name = "ay", mixinStandardHelpOptions = true)
-public class AyMain implements QuarkusApplication, Runnable {
+@CommandLine.Command(name = "c3", mixinStandardHelpOptions = true)
+public class CLIMain implements QuarkusApplication, Runnable {
     @Inject
     CommandLine.IFactory factory; 
 
@@ -33,10 +33,11 @@ public class AyMain implements QuarkusApplication, Runnable {
 
     @Override
     public void run() {        
-        Log.info("AY! Anonymaise is *destructive*, sure you have a backup? ");
-        Log.info("Included schemas: " + execution.getConfig().includeSchemas());  
+        Log.info("🐈 MEOW: C3 is *destructive*, sure you have a backup? ");
+        Log.infof("Included schemas: %s", execution.getConfig().includeSchemas());  
         ay();
-        Log.info("AY! Anonymaise finished! " + execution);
+        Log.info(execution);
+        Log.info("🐱"); 
     }
 
     private void ay() {
@@ -69,6 +70,6 @@ public class AyMain implements QuarkusApplication, Runnable {
     }
 
     public static void main(String[] args) {
-        Quarkus.run(AyMain.class, args);
+        Quarkus.run(CLIMain.class, args);
     }
 }
