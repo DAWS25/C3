@@ -2,7 +2,6 @@
   "name": "Anonymaise Dev Container",
   "image": "mcr.microsoft.com/devcontainers/base",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/java:1": {
       "jdkDistro": "graalce",
       "installMaven": "true"
