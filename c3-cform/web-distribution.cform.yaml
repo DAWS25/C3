@@ -1,22 +1,4 @@
-# OTO Distribution CloudFormation Template
-# Static website distribution with S3 bucket, CloudFront distribution, and Origin Access Control
-#
-# Example deployment:
-# BUCKET_NAME="oto-distribution"
-# DOMAIN_NAME="oto.faermanj.com"
-# ZONE_ID="Z044981111XDI2RGQ2GM9"
-# CERTIFICATE_ARN="arn:aws:acm:us-east-1:730335617563:certificate/777043cb-290c-4e63-8a20-c970da31a8bf"
-#
-# aws cloudformation deploy \
-#   --template-file oto-sam/distribution.cform.yaml \
-#   --stack-name "oto-distribution-stack" \
-#   --parameter-overrides \
-#     DomainName=$DOMAIN_NAME \
-#     HostedZoneId=$ZONE_ID \
-#     CertificateArn=$CERTIFICATE_ARN \
-#   --capabilities CAPABILITY_IAM
-
-Description: "Static website distribution with S3 bucket, CloudFront distribution, and Origin Access Control"
+Description: "Distribution of C3"
 
 Parameters:
   EnvId:

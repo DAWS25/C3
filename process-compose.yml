@@ -2,15 +2,5 @@ version: "0.5"
 
 processes:
   # foundation services
-  0-mysql:
-    compose:
-      file: process-compose.yml
-      service: mysql
-    healthcheck:
-      type: tcp
-      options:
-        host: localhost
-        port: 3306
-        timeout: 5
-        interval: 2
-        retries: 5
+  1-web:
+    command: ./scripts/dev-start-web.sh
