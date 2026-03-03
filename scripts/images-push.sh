@@ -15,7 +15,7 @@ export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
 export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"
 echo "Build and push images started for version[$BUILD_VERSION] using command[$DOCKER_CMD]"
 
-SKIP_PRUNE=${SKIP_PRUNE:-"false"}
+SKIP_PRUNE=${SKIP_PRUNE:-"true"}
 if [ "$SKIP_PRUNE" == "false" ]; then
     echo "Pruning local docker system"
     $DOCKER_CMD system prune -f
@@ -44,7 +44,7 @@ C3_API_TAG="c3-api:$BUILD_VERSION"
 $DOCKER_CMD build $BUILD_XARGS -f c3-api/Containerfile -t $C3_API_TAG .
 
 
-SKIP_PUSH=${SKIP_PUSH:-"true"}
+SKIP_PUSH=${SKIP_PUSH:-"false"}
 if [ "$SKIP_PUSH" == "false" ]; then
     echo "Pushing images"
     export REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
