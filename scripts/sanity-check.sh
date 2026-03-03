@@ -3,13 +3,16 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 pushd "$DIR/.."
 echo "script [$0] started"
-#!
+##
 
-echo "Starting C3 web"
-pushd c3-web
-npm run dev
+echo "Sanity check started"
+aws --version
+cdk --version
+pushd ..
+find .
 popd
+echo "Sanity check completed"
 
-#!
+##
 popd
 echo "script [$0] completed"

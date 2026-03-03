@@ -1,48 +1,67 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 pushd "$DIR/.."
+echo "Script[$0] started"
+##
 
+DOCKER_CMD=${DOCKER_CMD:-"docker"}
 export AWS_PAGER=""
 
-# --- Build image
-docker build \
-  --no-cache \
-  --progress=plain \
-  -f Containerfile \
-  -t ay:latest \
-  .
+export VERSION_X=$(cat version.x.txt)
+export VERSION_Y=$(cat version.y.txt)
+export VERSION_Z=$(date +%Y%m%d%H%M%S)
+export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
+export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"
+echo "Build and push images started for version[$BUILD_VERSION] using command[$DOCKER_CMD]"
 
-# Print image size and summary info
-docker images ay:latest
+SKIP_PRUNE=${SKIP_PRUNE:-"false"}
+if [ "$SKIP_PRUNE" == "false" ]; then
+    echo "Pruning local docker system"
+    $DOCKER_CMD system prune -f
+fi
 
-# --- Login to Amazon ECR Public (auth region is us-east-1)
-PUB_REGION="us-east-1"
-aws ecr-public get-login-password --region "$PUB_REGION" \
-  | docker login --username AWS --password-stdin public.ecr.aws
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_REGION=$(aws configure get region)
+echo "Authenticating to ECR Registry for account[$AWS_ACCOUNT_ID] and region[$AWS_REGION]"
+aws ecr get-login-password --region $AWS_REGION | $DOCKER_CMD login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-# --- Ensure repository exists (public ECR)
-aws ecr-public describe-repositories --region "$PUB_REGION" --repository-names ay >/dev/null 2>&1 \
-  || aws ecr-public create-repository --region "$PUB_REGION" --repository-name ay >/dev/null
+echo "Bulding images"
+VERSION_XARGS="--build-arg BUILD_VERSION=${BUILD_VERSION} --build-arg UBI_VERSION=${UBI_VERSION}"
+BUILD_XARGS="--no-cache --progress=plain $VERSION_XARGS" # DEBUG ARGUMENTS
+# BUILD_XARGS="$VERSION_XARGS" # REGULAR ARGUMENTS
 
-# --- Resolve your public registry URI (e.g., public.ecr.aws/xxxx)
-REGISTRY_URI="$(aws ecr-public describe-registries --region "$PUB_REGION" --query 'registries[0].registryUri' --output text)"
-# Extract the alias/namespace part after "public.ecr.aws/"
-REGISTRY_ALIAS="${REGISTRY_URI#public.ecr.aws/}"
+echo "Building C3 UBI image"
+C3_UBI_TAG="c3-ubi:$UBI_VERSION"
+$DOCKER_CMD build $BUILD_XARGS -f c3-ubi/Containerfile -t $C3_UBI_TAG . 
 
-# --- Tag & push
-PUBLIC_IMAGE_URI="${REGISTRY_URI}/ay:latest"
-docker tag ay:latest "$PUBLIC_IMAGE_URI"
-docker push "$PUBLIC_IMAGE_URI"
+echo "Building C3 build image"
+C3_BUILD_TAG="c3-build:$BUILD_VERSION"
+$DOCKER_CMD build $BUILD_XARGS -f c3-build/Containerfile -t $C3_BUILD_TAG .
 
-# --- Public gallery URL (shareable web page)
-IMAGE_URL="https://gallery.ecr.aws/${REGISTRY_ALIAS}/ay"
-echo "Image pushed to ECR Public: $PUBLIC_IMAGE_URI"
-echo "Public gallery page: $IMAGE_URL"
+echo "Building C3 API image"
+C3_API_TAG="c3-api:$BUILD_VERSION"
+$DOCKER_CMD build $BUILD_XARGS -f c3-api/Containerfile -t $C3_API_TAG .
 
-# --- How to run (pulls from public)
-echo "To run the image:"
-echo "docker run public.ecr.aws/${REGISTRY_ALIAS}/ay:latest"
 
+SKIP_PUSH=${SKIP_PUSH:-"true"}
+if [ "$SKIP_PUSH" == "false" ]; then
+    echo "Pushing images"
+    export REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    $DOCKER_CMD tag $C3_UBI_TAG $REGISTRY_URI/$C3_UBI_TAG
+    $DOCKER_CMD push $REGISTRY_URI/$C3_UBI_TAG  
+
+    $DOCKER_CMD tag $C3_API_TAG $REGISTRY_URI/$C3_API_TAG
+    $DOCKER_CMD push $REGISTRY_URI/$C3_API_TAG
+fi
+
+echo "Push images completed for version $VERSION"
+echo "# Check the build image:"
+echo "docker run -it --rm $C3_BUILD_TAG bash"
+
+echo "# Run the API image:"
+echo "docker run -it --rm -p 10274:10274 $C3_API_TAG"
+
+##
 popd
-echo "Public ECR build & push complete."
+echo "Script[$0] completed"

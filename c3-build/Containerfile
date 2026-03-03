@@ -1,0 +1,14 @@
+ARG BASE_IMAGE="c3-ubi"
+ARG UBI_VERSION="0.0"
+ARG USERNAME="code"
+
+FROM ${BASE_IMAGE}:${UBI_VERSION}
+
+ENV USERNAME=${USERNAME}
+
+# Copy source code
+WORKDIR "/home/$USERNAME/src"
+COPY --chown=$USERNAME  . .
+
+ # Run build
+RUN make

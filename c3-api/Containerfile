@@ -1,0 +1,49 @@
+ARG BUILD_IMAGE="c3-build"
+ARG BUILD_VERSION="0.0.0"
+ARG RUNTIME_IMAGE="public.ecr.aws/amazonlinux/amazonlinux"
+ARG RUNTIME_VERSION="2023"
+ARG USERNAME="code"
+
+FROM ${BUILD_IMAGE}:${BUILD_VERSION} AS build
+
+
+
+
+FROM ${RUNTIME_IMAGE}:${RUNTIME_VERSION}
+
+ARG USERNAME="code"
+ARG USER_UID=1001
+ARG ARTIFACT_ID="c3-api"
+ARG EXPOSE_PORT="10274"
+ARG HOMEDIR="/home/${USERNAME}"
+ARG JAVA_HOME="${HOMEDIR}/jre"
+ARG APP_DIR="${HOMEDIR}/src/${ARTIFACT_ID}/target/quarkus-app"
+
+COPY --from=build "${JAVA_HOME}" "${JAVA_HOME}"
+COPY --from=build "${APP_DIR}" "${APP_DIR}"
+
+EXPOSE ${EXPOSE_PORT}
+
+#Consider removing user shell
+RUN echo "$USERNAME:x:$USER_UID:$USER_UID:$USERNAME User:${HOMEDIR}:/bin/sh" >> /etc/passwd && \
+    echo "$USERNAME:x:$USER_UID:" >> /etc/group && \
+    mkdir -p /home/$USERNAME && \
+    chown -R $USER_UID:$USER_UID /home/$USERNAME
+
+RUN dnf install -y findutils
+RUN find ${HOMEDIR}
+
+USER ${USERNAME}
+ENV USERNAME=${USERNAME}
+ENV HOMEDIR=${HOMEDIR}
+ENV ARTIFACT_ID=${ARTIFACT_ID}
+ENV JAVA_HOME="${JAVA_HOME}"
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+ENV APP_DIR="${APP_DIR}"
+
+
+
+WORKDIR "${APP_DIR}"
+RUN find .
+RUN pwd
+ENTRYPOINT ["java", "-jar", "quarkus-run.jar"]
