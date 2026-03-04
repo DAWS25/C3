@@ -1,0 +1,27 @@
+Description: CloudFormation template for ECS Task Execution Role
+Resources:
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvId}-ecs-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: EnvId
+          Value: !Ref EnvId
+Outputs:
+  ExecutionRoleArn:
+    Description: The ARN of the ECS Task Execution Role
+    Value: !GetAtt ExecutionRole.Arn
+    Export:
+      Name: !Sub '${EnvId}-ExecutionRoleArn'

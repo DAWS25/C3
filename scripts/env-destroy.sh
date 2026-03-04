@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+pushd "$DIR/.." >/dev/null
+
+ENV_ID=${ENV_ID:-"c3-local"}
+
+WEB_DISTRIBUTION_STACK="$ENV_ID-web-distribution-stack"
+ALB_SERVICES_STACK="$ENV_ID-alb-services-stack"
+ECS_CLUSTER_STACK="$ENV_ID-ecs-cluster-stack"
+ACM_CERT_STACK="$ENV_ID-acm-cert-stack"
+WEB_BUCKET_STACK="$ENV_ID-web-bucket-stack"
+
+stack_exists() {
+	local stack_name="$1"
+	aws cloudformation describe-stacks --stack-name "$stack_name" >/dev/null 2>&1
+}
+
+delete_stack_if_exists() {
+	local stack_name="$1"
+	if stack_exists "$stack_name"; then
+		echo "Deleting stack: $stack_name"
+		aws cloudformation delete-stack --stack-name "$stack_name"
+		aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
+		echo "Deleted stack: $stack_name"
+	else
+		echo "Skipping missing stack: $stack_name"
+	fi
+}
+
+echo "## Destroying env stacks for ENV_ID=$ENV_ID"
+
+delete_stack_if_exists "$WEB_DISTRIBUTION_STACK"
+delete_stack_if_exists "$ALB_SERVICES_STACK"
+delete_stack_if_exists "$ECS_CLUSTER_STACK"
+delete_stack_if_exists "$ACM_CERT_STACK"
+
+if stack_exists "$WEB_BUCKET_STACK"; then
+	BUCKET_NAME=$(aws cloudformation describe-stacks \
+		--stack-name "$WEB_BUCKET_STACK" \
+		--query "Stacks[0].Outputs[?OutputKey=='ResourcesBucketName'].OutputValue" \
+		--output text)
+
+	if [[ -n "$BUCKET_NAME" && "$BUCKET_NAME" != "None" ]]; then
+		echo "Emptying bucket: $BUCKET_NAME"
+		aws s3 rm "s3://$BUCKET_NAME" --recursive || true
+	fi
+fi
+
+delete_stack_if_exists "$WEB_BUCKET_STACK"
+
+echo "## Destroy completed for ENV_ID=$ENV_ID"
+
+popd >/dev/null

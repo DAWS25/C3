@@ -8,11 +8,36 @@ Parameters:
     Type: String
     Description: Name of the ECR repository
 
+  EmptyOnDelete:
+    Type: String
+    Default: "true"
+    Description: Whether to empty the repository on stack deletion 
+    AllowedValues:
+      - "true"
+      - "false"
+
+  Mutability:
+    Type: String
+    Default: IMMUTABLE_WITH_EXCLUSION
+    Description: Whether the repository is mutable 
+
+Conditions:
+  IsEmptyOnDelete: !Equals [!Ref EmptyOnDelete, "true"]
+
 Resources:
   Repository:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: !Ref RepositoryName
+      EmptyOnDelete: !If [IsEmptyOnDelete, true, false]
+      ImageTagMutability: !Ref Mutability
+      #TODO: EncryptionConfiguration
+      ImageTagMutabilityExclusionFilters:
+        - ImageTagMutabilityExclusionFilterType: "WILDCARD"
+          ImageTagMutabilityExclusionFilterValue: "latest"
+      Tags:
+        - Key: Name
+          Value: !Sub ${RepositoryName}-repository
 
 Outputs:
   RepositoryArn:
