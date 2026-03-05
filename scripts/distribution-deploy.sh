@@ -15,6 +15,25 @@ ENV_DOMAIN="${ENV_ID}.${TENANT_DOMAIN}"
 DOMAIN_NAME=${DOMAIN_NAME:-"$ENV_DOMAIN"}
 HOSTED_ZONE_ID=${HOSTED_ZONE_ID:-${ZONE_ID:-""}}
 
+stack_status() {
+    local stack_name="$1"
+    aws cloudformation describe-stacks \
+        --stack-name "$stack_name" \
+        --query 'Stacks[0].StackStatus' \
+        --output text 2>/dev/null || true
+}
+
+delete_stack_if_rollback_complete() {
+    local stack_name="$1"
+    local status
+    status=$(stack_status "$stack_name")
+    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
+        echo "Deleting rollback-complete stack: $stack_name"
+        aws cloudformation delete-stack --stack-name "$stack_name"
+        aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
+    fi
+}
+
 if [[ -z "$DOMAIN_NAME" ]]; then
     echo "DOMAIN_NAME is required"
     exit 1
@@ -48,6 +67,7 @@ if [[ -z "$CERTIFICATE_ARN" || "$CERTIFICATE_ARN" == "None" ]]; then
 fi
 
 DISTRIBUTION_STACK_NAME="$STACK_PREFIX-web-distribution-stack"
+delete_stack_if_rollback_complete "$DISTRIBUTION_STACK_NAME"
 echo "## Deploying DISTRIBUTION stack..."
 aws cloudformation deploy \
     --stack-name "$DISTRIBUTION_STACK_NAME" \
