@@ -9,6 +9,8 @@ TENANT_ID=${TENANT_ID:-"c3"}
 STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
 
 ALB_SERVICES_STACK="$STACK_PREFIX-alb-services-stack"
+EKS_CLUSTER_STACK="$STACK_PREFIX-eks-cluster-stack"
+EKS_ROLE_STACK="$STACK_PREFIX-eks-role-stack"
 ECS_CLUSTER_STACK="$STACK_PREFIX-ecs-cluster-stack"
 ECS_ROLE_STACK="$STACK_PREFIX-ecs-role-stack"
 WEB_BUCKET_STACK="$STACK_PREFIX-web-bucket-stack"
@@ -33,6 +35,8 @@ delete_stack_if_exists() {
 echo "## Destroying env stacks for TENANT_ID=$TENANT_ID ENV_ID=$ENV_ID"
 
 delete_stack_if_exists "$ALB_SERVICES_STACK"
+delete_stack_if_exists "$EKS_CLUSTER_STACK"
+delete_stack_if_exists "$EKS_ROLE_STACK"
 delete_stack_if_exists "$ECS_CLUSTER_STACK"
 delete_stack_if_exists "$ECS_ROLE_STACK"
 

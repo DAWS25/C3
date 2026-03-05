@@ -42,6 +42,11 @@ Parameters:
     Default: "/,/*"
     Description: ALB listener rule path patterns
 
+  HealthCheckPath:
+    Type: String
+    Default: /api/
+    Description: ALB target group health check path
+
   ListenerRulePriority:
     Type: Number
     Default: 2048
@@ -134,7 +139,7 @@ Resources:
       VpcId:
         Fn::ImportValue: !Sub "${TenantId}-VpcId"
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPath: !Ref HealthCheckPath
       Matcher:
         HttpCode: "200"
 

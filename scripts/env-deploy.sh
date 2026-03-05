@@ -101,6 +101,22 @@ aws cloudformation deploy \
     --template-file ecs-cluster.cform.yaml \
     --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
 
+echo "## deploying EKS CLUSTER stack..."
+EKS_ROLE_STACK_NAME="$STACK_PREFIX-eks-role-stack"
+delete_stack_if_rollback_complete "$EKS_ROLE_STACK_NAME"
+aws cloudformation deploy \
+    --stack-name "$EKS_ROLE_STACK_NAME" \
+    --template-file eks-role.cform.yaml \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
+
+EKS_CLUSTER_STACK_NAME="$STACK_PREFIX-eks-cluster-stack"
+delete_stack_if_rollback_complete "$EKS_CLUSTER_STACK_NAME"
+aws cloudformation deploy \
+    --stack-name "$EKS_CLUSTER_STACK_NAME" \
+    --template-file eks-cluster.cform.yaml \
+    --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
+
 echo "## Deploying ALB SERVICES stack..."
 ALB_SERVICES_STACK_NAME="$STACK_PREFIX-alb-services-stack"
 delete_stack_if_rollback_complete "$ALB_SERVICES_STACK_NAME"

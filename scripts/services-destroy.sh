@@ -10,6 +10,10 @@ ENV_ID=${ENV_ID:-"local"}
 STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
 
 C3_API_STACK_NAME="$STACK_PREFIX-c3-api-stack"
+KAPI_STACK_NAME="$STACK_PREFIX-kapi-stack"
+KAPI_SERVICE_NAME=${KAPI_SERVICE_NAME:-"kapi"}
+KAPI_NAMESPACE=${KAPI_NAMESPACE:-"default"}
+KAPI_EKS_CLUSTER_NAME=${KAPI_EKS_CLUSTER_NAME:-"${ENV_ID}-eks-cluster"}
 
 stack_exists() {
   local stack_name="$1"
@@ -23,6 +27,25 @@ if stack_exists "$C3_API_STACK_NAME"; then
   echo "Deleted service stack: $C3_API_STACK_NAME"
 else
   echo "Skipping missing stack: $C3_API_STACK_NAME"
+fi
+
+if stack_exists "$KAPI_STACK_NAME"; then
+  echo "Deleting service stack: $KAPI_STACK_NAME"
+  aws cloudformation delete-stack --stack-name "$KAPI_STACK_NAME"
+  aws cloudformation wait stack-delete-complete --stack-name "$KAPI_STACK_NAME"
+  echo "Deleted service stack: $KAPI_STACK_NAME"
+else
+  echo "Skipping missing stack: $KAPI_STACK_NAME"
+fi
+
+if command -v kubectl >/dev/null 2>&1; then
+  AWS_REGION=$(aws configure get region)
+  if aws eks describe-cluster --name "$KAPI_EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+    echo "Deleting kapi workload from EKS cluster: $KAPI_EKS_CLUSTER_NAME"
+    AWS_PAGER="" aws eks update-kubeconfig --name "$KAPI_EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null || true
+    kubectl -n "$KAPI_NAMESPACE" delete service "$KAPI_SERVICE_NAME" --ignore-not-found=true || true
+    kubectl -n "$KAPI_NAMESPACE" delete deployment "$KAPI_SERVICE_NAME" --ignore-not-found=true || true
+  fi
 fi
 
 ##

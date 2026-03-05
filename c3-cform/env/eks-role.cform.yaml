@@ -1,0 +1,58 @@
+Description: EKS Cluster and Fargate IAM Roles
+
+Parameters:
+  EnvId:
+    Type: String
+    Default: project
+
+  TenantId:
+    Type: String
+    Default: project
+
+Resources:
+  EKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvId}-eks-cluster-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+      Tags:
+        - Key: EnvId
+          Value: !Ref EnvId
+
+  EKSPodExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvId}-eks-fargate-pod-exec-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks-fargate-pods.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy
+      Tags:
+        - Key: EnvId
+          Value: !Ref EnvId
+
+Outputs:
+  EKSClusterRoleArn:
+    Description: EKS cluster IAM role ARN
+    Value: !GetAtt EKSClusterRole.Arn
+    Export:
+      Name: !Sub '${EnvId}-EKSClusterRoleArn'
+
+  EKSPodExecutionRoleArn:
+    Description: EKS Fargate pod execution IAM role ARN
+    Value: !GetAtt EKSPodExecutionRole.Arn
+    Export:
+      Name: !Sub '${EnvId}-EKSPodExecutionRoleArn'

@@ -67,7 +67,9 @@ if [[ -z "$CERTIFICATE_ARN" || "$CERTIFICATE_ARN" == "None" ]]; then
 fi
 
 DISTRIBUTION_STACK_NAME="$STACK_PREFIX-web-distribution-stack"
+DISTRIBUTION_DNS_ALIAS_STACK_NAME="$STACK_PREFIX-web-distribution-dns-alias-stack"
 delete_stack_if_rollback_complete "$DISTRIBUTION_STACK_NAME"
+delete_stack_if_rollback_complete "$DISTRIBUTION_DNS_ALIAS_STACK_NAME"
 echo "## Deploying DISTRIBUTION stack..."
 aws cloudformation deploy \
     --stack-name "$DISTRIBUTION_STACK_NAME" \
@@ -76,8 +78,16 @@ aws cloudformation deploy \
         EnvId="$ENV_ID" \
         TenantId="$TENANT_ID" \
         DomainName="$DOMAIN_NAME" \
-        HostedZoneId="$HOSTED_ZONE_ID" \
         CertificateArn="$CERTIFICATE_ARN"
+
+echo "## Deploying DISTRIBUTION DNS ALIAS stack..."
+aws cloudformation deploy \
+    --stack-name "$DISTRIBUTION_DNS_ALIAS_STACK_NAME" \
+    --template-file c3-cform/distribution/web-distribution-dns-alias.cform.yaml \
+    --parameter-overrides \
+        EnvId="$ENV_ID" \
+        DomainName="$DOMAIN_NAME" \
+        HostedZoneId="$HOSTED_ZONE_ID"
 
 echo "Script [$0] completed for ENV_ID=$ENV_ID and DOMAIN_NAME=$DOMAIN_NAME"
 #!

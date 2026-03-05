@@ -1,0 +1,78 @@
+Description: ALB routing for kapi service running on EKS
+
+Parameters:
+  TenantId:
+    Type: String
+    Default: c3
+
+  EnvId:
+    Type: String
+    Default: project
+
+  ServiceName:
+    Type: String
+    Default: kapi
+
+  ContainerPort:
+    Type: Number
+    Default: 10274
+
+  PathPatterns:
+    Type: CommaDelimitedList
+    Default: /kapi,/kapi/*
+
+  HealthCheckPath:
+    Type: String
+    Default: /kapi/
+
+  ListenerRulePriority:
+    Type: Number
+    Default: 2049
+
+Resources:
+  KapiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${EnvId}-${ServiceName}'
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Sub '${TenantId}-VpcId'
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: !Ref HealthCheckPath
+      Matcher:
+        HttpCode: '200'
+
+  KapiHttpsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn:
+        Fn::ImportValue: !Sub '${EnvId}-HttpsListenerArn'
+      Priority: !Ref ListenerRulePriority
+      Conditions:
+        - Field: path-pattern
+          Values: !Ref PathPatterns
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref KapiTargetGroup
+
+  KapiHttpListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn:
+        Fn::ImportValue: !Sub '${EnvId}-HttpListenerArn'
+      Priority: !Ref ListenerRulePriority
+      Conditions:
+        - Field: path-pattern
+          Values: !Ref PathPatterns
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref KapiTargetGroup
+
+Outputs:
+  KapiTargetGroupArn:
+    Description: kapi target group arn
+    Value: !Ref KapiTargetGroup
+    Export:
+      Name: !Sub '${EnvId}-${ServiceName}TargetGroupArn'

@@ -1,0 +1,33 @@
+Description: "DNS alias for C3 distribution"
+
+Parameters:
+  EnvId:
+    Type: String
+    Default: project
+    Description: Environment identifier used to resolve imported distribution outputs.
+
+  DomainName:
+    Type: String
+    Description: DNS record name to map to the CloudFront distribution.
+    AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$
+
+  HostedZoneId:
+    Type: String
+    Description: Route53 hosted zone ID where the alias record is created.
+
+Resources:
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::ImportValue: !Sub "${EnvId}-distribution-domain-name"
+        HostedZoneId: Z2FDTNDATAQYW2
+
+Outputs:
+  AliasRecordName:
+    Description: Alias record DNS name
+    Value: !Ref DomainName

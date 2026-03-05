@@ -1,0 +1,99 @@
+Description: EKS Fargate-only Cluster
+
+Parameters:
+  EnvId:
+    Type: String
+    Default: project
+
+  TenantId:
+    Type: String
+    Default: project
+
+  KubernetesVersion:
+    Type: String
+    Default: '1.35'
+
+Resources:
+  EKSClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${EnvId}-eks-cluster-sg'
+      VpcId:
+        Fn::ImportValue: !Sub '${TenantId}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 10274
+          ToPort: 10274
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub '${EnvId}-ALBSecurityGroupId'
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Sub '${EnvId}-eks-cluster'
+      Version: !Ref KubernetesVersion
+      RoleArn:
+        Fn::ImportValue: !Sub '${EnvId}-EKSClusterRoleArn'
+      ResourcesVpcConfig:
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: false
+        SecurityGroupIds:
+          - !Ref EKSClusterSecurityGroup
+        SubnetIds:
+          - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet1Id'
+          - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet2Id'
+          - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet3Id'
+
+  EKSFargateProfileDefault:
+    Type: AWS::EKS::FargateProfile
+    Properties:
+      ClusterName: !Ref EKSCluster
+      FargateProfileName: !Sub '${EnvId}-default'
+      PodExecutionRoleArn:
+        Fn::ImportValue: !Sub '${EnvId}-EKSPodExecutionRoleArn'
+      Subnets:
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet1Id'
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet2Id'
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet3Id'
+      Selectors:
+        - Namespace: default
+
+  EKSFargateProfileKubeSystem:
+    Type: AWS::EKS::FargateProfile
+    Properties:
+      ClusterName: !Ref EKSCluster
+      FargateProfileName: !Sub '${EnvId}-kube-system'
+      PodExecutionRoleArn:
+        Fn::ImportValue: !Sub '${EnvId}-EKSPodExecutionRoleArn'
+      Subnets:
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet1Id'
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet2Id'
+        - Fn::ImportValue: !Sub '${TenantId}-PublicSubnet3Id'
+      Selectors:
+        - Namespace: kube-system
+          Labels:
+            k8s-app: kube-dns
+
+Outputs:
+  EKSClusterName:
+    Description: EKS cluster name
+    Value: !Ref EKSCluster
+    Export:
+      Name: !Sub '${EnvId}-EKSClusterName'
+
+  EKSClusterArn:
+    Description: EKS cluster ARN
+    Value: !GetAtt EKSCluster.Arn
+    Export:
+      Name: !Sub '${EnvId}-EKSClusterArn'
+
+  EKSClusterSecurityGroupId:
+    Description: EKS cluster security group id
+    Value: !Ref EKSClusterSecurityGroup
+    Export:
+      Name: !Sub '${EnvId}-EKSClusterSecurityGroupId'

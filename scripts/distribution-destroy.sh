@@ -8,6 +8,7 @@ ENV_ID=${ENV_ID:-"local"}
 TENANT_ID=${TENANT_ID:-"c3"}
 STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
 DISTRIBUTION_STACK="$STACK_PREFIX-web-distribution-stack"
+DISTRIBUTION_DNS_ALIAS_STACK="$STACK_PREFIX-web-distribution-dns-alias-stack"
 
 stack_exists() {
 	local stack_name="$1"
@@ -15,6 +16,15 @@ stack_exists() {
 }
 
 echo "## Destroying distribution stack for TENANT_ID=$TENANT_ID ENV_ID=$ENV_ID"
+
+if stack_exists "$DISTRIBUTION_DNS_ALIAS_STACK"; then
+	echo "Deleting stack: $DISTRIBUTION_DNS_ALIAS_STACK"
+	aws cloudformation delete-stack --stack-name "$DISTRIBUTION_DNS_ALIAS_STACK"
+	aws cloudformation wait stack-delete-complete --stack-name "$DISTRIBUTION_DNS_ALIAS_STACK"
+	echo "Deleted stack: $DISTRIBUTION_DNS_ALIAS_STACK"
+else
+	echo "Skipping missing stack: $DISTRIBUTION_DNS_ALIAS_STACK"
+fi
 
 if stack_exists "$DISTRIBUTION_STACK"; then
 	BUCKET_NAME=$(aws cloudformation list-stack-resources \
