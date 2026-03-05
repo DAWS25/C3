@@ -15,6 +15,11 @@ Parameters:
     Default: project
     Description: Environment identifier used to prefix exported outputs.
 
+  TenantId:
+    Type: String
+    Default: project
+    Description: Tenant identifier passed from deployment script.
+
 Resources:
   ResourcesBucket:
     Type: AWS::S3::Bucket
@@ -24,16 +29,16 @@ Outputs:
     Description: Static web resource bucket name
     Value: !Ref ResourcesBucket
     Export:
-      Name: !Sub "${EnvId}-ResourcesBucketName"
+      Name: !Sub "${EnvId}-BucketName"
 
   ResourcesBucketArn:
     Description: Static web resource bucket ARN
     Value: !GetAtt ResourcesBucket.Arn
     Export:
-      Name: !Sub "${EnvId}-ResourcesBucketArn"
+      Name: !Sub "${EnvId}-BucketArn"
 
   ResourcesBucketDomainName:
     Description: Static web resource bucket domain name
     Value: !GetAtt ResourcesBucket.RegionalDomainName
     Export:
-      Name: !Sub "${EnvId}-ResourcesBucketDomainName"
+      Name: !Sub "${EnvId}-BucketDomainName"

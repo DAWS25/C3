@@ -5,11 +5,12 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 pushd "$DIR/.." >/dev/null
 
 ENV_ID=${ENV_ID:-"c3-local"}
+TENANT_ID=${TENANT_ID:-"$ENV_ID"}
 
 WEB_DISTRIBUTION_STACK="$ENV_ID-web-distribution-stack"
 ALB_SERVICES_STACK="$ENV_ID-alb-services-stack"
 ECS_CLUSTER_STACK="$ENV_ID-ecs-cluster-stack"
-ACM_CERT_STACK="$ENV_ID-acm-cert-stack"
+ACM_CERT_STACK="$TENANT_ID-acm-cert-stack"
 WEB_BUCKET_STACK="$ENV_ID-web-bucket-stack"
 
 stack_exists() {

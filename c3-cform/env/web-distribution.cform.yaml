@@ -6,6 +6,11 @@ Parameters:
     Default: project
     Description: Environment identifier used to prefix exported outputs.
 
+  TenantId:
+    Type: String
+    Default: project
+    Description: Tenant identifier passed from deployment script.
+
   DomainName:
     Type: String
     Description: Custom domain name for the CloudFront distribution (e.g., oto.example.com)
@@ -70,7 +75,7 @@ Resources:
         Origins:
           - Id: S3Origin
             DomainName:
-              Fn::ImportValue: !Sub "${EnvId}-ResourcesBucketDomainName"
+              Fn::ImportValue: !Sub "${EnvId}-BucketDomainName"
             OriginAccessControlId: !Ref OriginAccessControl
             S3OriginConfig:
               OriginAccessIdentity: ""
@@ -84,7 +89,7 @@ Resources:
     DependsOn: CloudFrontDistribution
     Properties:
       Bucket:
-        Fn::ImportValue: !Sub "${EnvId}-ResourcesBucketName"
+        Fn::ImportValue: !Sub "${EnvId}-BucketName"
       PolicyDocument:
         Statement:
           - Sid: AllowCloudFrontServicePrincipal
@@ -96,7 +101,7 @@ Resources:
               Fn::Sub:
                 - "arn:aws:s3:::${ResourcesBucketName}/*"
                 - ResourcesBucketName:
-                    Fn::ImportValue: !Sub "${EnvId}-ResourcesBucketName"
+                    Fn::ImportValue: !Sub "${EnvId}-BucketName"
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"

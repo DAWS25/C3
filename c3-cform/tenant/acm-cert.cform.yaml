@@ -2,7 +2,7 @@
 Description: ACM Certificate
 
 Parameters:
-  EnvId:
+  TenantId:
     Type: String
     Default: project
 
@@ -30,4 +30,4 @@ Outputs:
     Description: ARN of the ACM certificate
     Value: !Ref Certificate
     Export:
-      Name: !Sub "${EnvId}-AcmCertificateArn"
+      Name: !Sub "${TenantId}-CertificateArn"

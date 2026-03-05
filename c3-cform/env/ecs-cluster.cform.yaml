@@ -17,6 +17,10 @@ Parameters:
   EnvId:
     Type: String
     Default: project
+
+  TenantId:
+    Type: String
+    Default: project
   
   ContainerInsights:
     Type: String

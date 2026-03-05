@@ -1,6 +1,6 @@
 # aws cloudformation deploy --stack-name c3-r53-zone-delegation-stack --template-file c3-cform/tenant/r53-zone-delegation.cform.yaml --parameter-overrides ParentZoneId=Z1234567890ABCDE DelegatedSubdomain=c3.daws25.com TenantId=c3
 # aws cloudformation delete-stack --stack-name c3-r53-zone-delegation-stack
-Description: CloudFormation template to delegate a tenant subdomain from a parent Route 53 hosted zone
+Description: delegate a tenant subdomain from a parent Route 53 hosted zone
 
 Parameters:
   ParentZoneId:
@@ -26,7 +26,7 @@ Resources:
       ResourceRecords:
         Fn::Split:
           - ","
-          - Fn::ImportValue: !Sub "${TenantId}-ZoneNameServers"
+          - Fn::ImportValue: !Sub "${TenantId}-NameServers"
 
 Outputs:
   DelegatedRecordName:
@@ -36,4 +36,4 @@ Outputs:
   DelegationNameServers:
     Description: Name servers used for delegation
     Value:
-      Fn::ImportValue: !Sub "${TenantId}-ZoneNameServers"
+      Fn::ImportValue: !Sub "${TenantId}-NameServers"

@@ -1,6 +1,6 @@
 # aws cloudformation deploy --stack-name r53-hosted-zone --template-file cloudformation/r53-hosted-zone/template.cform.yaml --parameter-overrides DomainName=faermanj.com
 # aws cloudformation delete-stack --stack-name r53-hosted-zone
-Description: CloudFormation template to create a Route 53 Hosted Zone
+Description: create a Route 53 Hosted Zone
 
 Parameters:
   TenantId:
@@ -31,4 +31,4 @@ Outputs:
     Description: The name servers for the created Route 53 zone
     Value: !Join [",", !GetAtt HostedZone.NameServers]
     Export:
-      Name: !Sub "${TenantId}-ZoneNameServers"
+      Name: !Sub "${TenantId}-NameServers"
