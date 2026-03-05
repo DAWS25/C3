@@ -3,29 +3,37 @@ set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 pushd "$DIR/.."
 #!
-
-BUILD_WEB=${BUILD_WEB:-"true"}
-
-if [[ "$BUILD_WEB" == "true" ]]; then
-    echo "Building C3 web application..."
-    pushd c3-web >/dev/null
-    if [[ ! -d node_modules ]]; then
-        npm ci
-    fi
-    npm run build
-    popd >/dev/null
-fi
-
+echo "Script [$0] started"
 aws sts get-caller-identity
 
-ENV_ID=${ENV_ID:-"c3-local"}
-DOMAIN_NAME=${DOMAIN_NAME:-""}
+TENANT_ID=${TENANT_ID:-"c3"}
+ENV_ID=${ENV_ID:-"local"}
+STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
+DOMAIN_PARENT=${DOMAIN_PARENT:-"daws25.com"}
+TENANT_DOMAIN=${TENANT_DOMAIN:-"$TENANT_ID.$DOMAIN_PARENT"}
+ENV_DOMAIN="${ENV_ID}.${TENANT_DOMAIN}"
+DOMAIN_NAME="$ENV_DOMAIN"
 HOSTED_ZONE_ID=${HOSTED_ZONE_ID:-${ZONE_ID:-""}}
-TENANT_ID=${TENANT_ID:-"$ENV_ID"}
 
 if [[ -z "$DOMAIN_NAME" ]]; then
     echo "DOMAIN_NAME is required"
     exit 1
+fi
+
+if [[ -z "$HOSTED_ZONE_ID" ]]; then
+    R53_STACK_NAME="$TENANT_ID-r53-zone-stack"
+    HOSTED_ZONE_ID=$(aws cloudformation describe-stacks \
+        --stack-name "$R53_STACK_NAME" \
+        --query "Stacks[0].Outputs[?OutputKey=='ZoneId'].OutputValue" \
+        --output text 2>/dev/null || true)
+
+    if [[ -z "$HOSTED_ZONE_ID" || "$HOSTED_ZONE_ID" == "None" ]]; then
+        echo "HOSTED_ZONE_ID not provided and unable to resolve it from stack $R53_STACK_NAME"
+        echo "Run ./scripts/tenant-deploy.sh first, or export HOSTED_ZONE_ID"
+        exit 1
+    fi
+
+    echo "Resolved HostedZoneId from $R53_STACK_NAME"
 fi
 
 stack_status() {
@@ -47,27 +55,11 @@ delete_stack_if_rollback_complete() {
     fi
 }
 
-if [[ -z "$HOSTED_ZONE_ID" ]]; then
-    R53_STACK_NAME="$TENANT_ID-r53-zone-stack"
-    HOSTED_ZONE_ID=$(aws cloudformation describe-stacks \
-        --stack-name "$R53_STACK_NAME" \
-        --query "Stacks[0].Outputs[?OutputKey=='ZoneId'].OutputValue" \
-        --output text 2>/dev/null || true)
-
-    if [[ -z "$HOSTED_ZONE_ID" || "$HOSTED_ZONE_ID" == "None" ]]; then
-        echo "HOSTED_ZONE_ID not provided and unable to resolve it from stack $R53_STACK_NAME"
-        echo "Run ./scripts/tenant-deploy.sh first, or export HOSTED_ZONE_ID"
-        exit 1
-    fi
-
-    echo "Resolved HostedZoneId from $R53_STACK_NAME"
-fi
-
 pushd c3-cform/env
 
 echo "## Deploying WEB BUCKET stack..."
 
-BUCKET_STACK_NAME="$ENV_ID-web-bucket-stack"
+BUCKET_STACK_NAME="$STACK_PREFIX-web-bucket-stack"
 delete_stack_if_rollback_complete "$BUCKET_STACK_NAME"
 aws cloudformation deploy \
     --stack-name "$BUCKET_STACK_NAME" \
@@ -93,45 +85,33 @@ fi
 
 aws s3 sync "$WEB_BUILD_DIR/" "s3://$BUCKET_NAME/" --delete
 
-CERT_STACK_NAME="$TENANT_ID-acm-cert-stack"
-CERTIFICATE_ARN=${CERTIFICATE_ARN:-$(aws cloudformation describe-stacks \
-    --stack-name "$CERT_STACK_NAME" \
-    --query "Stacks[0].Outputs[?OutputKey=='CertificateArn'].OutputValue" \
-    --output text)}
-
-if [[ -z "$CERTIFICATE_ARN" || "$CERTIFICATE_ARN" == "None" ]]; then
-  echo "Unable to resolve CertificateArn from stack $CERT_STACK_NAME"
-  exit 1
-fi
-
 echo "## deploying ECS CLUSTER stack..."
-delete_stack_if_rollback_complete "$ENV_ID-ecs-cluster-stack"
+ECS_ROLE_STACK_NAME="$STACK_PREFIX-ecs-role-stack"
+delete_stack_if_rollback_complete "$ECS_ROLE_STACK_NAME"
 aws cloudformation deploy \
-    --stack-name "$ENV_ID-ecs-cluster-stack" \
+    --stack-name "$ECS_ROLE_STACK_NAME" \
+    --template-file ecs-role.cform.yaml \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
+
+ECS_CLUSTER_STACK_NAME="$STACK_PREFIX-ecs-cluster-stack"
+delete_stack_if_rollback_complete "$ECS_CLUSTER_STACK_NAME"
+aws cloudformation deploy \
+    --stack-name "$ECS_CLUSTER_STACK_NAME" \
     --template-file ecs-cluster.cform.yaml \
     --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
 
 echo "## Deploying ALB SERVICES stack..."
-delete_stack_if_rollback_complete "$ENV_ID-alb-services-stack"
+ALB_SERVICES_STACK_NAME="$STACK_PREFIX-alb-services-stack"
+delete_stack_if_rollback_complete "$ALB_SERVICES_STACK_NAME"
 aws cloudformation deploy \
-    --stack-name "$ENV_ID-alb-services-stack" \
+    --stack-name "$ALB_SERVICES_STACK_NAME" \
     --template-file alb-services.cform.yaml \
     --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
-
-echo "## deploying DISTRIBUTION stack..."
-delete_stack_if_rollback_complete "$ENV_ID-web-distribution-stack"
-aws cloudformation deploy \
-    --stack-name "$ENV_ID-web-distribution-stack" \
-    --template-file web-distribution.cform.yaml \
-    --parameter-overrides \
-        EnvId="$ENV_ID" \
-        TenantId="$TENANT_ID" \
-        DomainName="$DOMAIN_NAME" \
-        HostedZoneId="$HOSTED_ZONE_ID" \
-        CertificateArn="$CERTIFICATE_ARN"
 
 
 popd
 
-#!
+##
+echo "Script [$0] completed for ENV_ID=$ENV_ID and DOMAIN_NAME=$DOMAIN_NAME"
 popd

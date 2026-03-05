@@ -27,7 +27,6 @@ Parameters:
     ConstraintDescription: Must be a valid ACM certificate ARN in us-east-1 region
 
 Resources:
-  # S3 Bucket for static files
   DistributionBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -37,7 +36,6 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
-  # Origin Access Control for CloudFront to access S3
   OriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -48,7 +46,6 @@ Resources:
         SigningProtocol: sigv4
         Description: !Sub "Origin Access Control for ${AWS::StackName}"
 
-  # CloudFront Distribution
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -70,6 +67,29 @@ Resources:
             QueryString: false
             Cookies:
               Forward: none
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: ALBOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - PATCH
+              - POST
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - "*"
+              Cookies:
+                Forward: all
         DefaultRootObject: index.html
         Enabled: true
         Origins:
@@ -79,11 +99,17 @@ Resources:
             OriginAccessControlId: !Ref OriginAccessControl
             S3OriginConfig:
               OriginAccessIdentity: ""
+          - Id: ALBOrigin
+            DomainName:
+              Fn::ImportValue: !Sub "${EnvId}-ALBDNSName"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
         ViewerCertificate:
           AcmCertificateArn: !Ref CertificateArn
           SslSupportMethod: sni-only
 
-  # Bucket Policy to allow CloudFront access via OAC
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn: CloudFrontDistribution
@@ -106,7 +132,6 @@ Resources:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
-  # Route53 Record for custom domain
   DNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:

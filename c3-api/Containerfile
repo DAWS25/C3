@@ -30,9 +30,6 @@ RUN echo "$USERNAME:x:$USER_UID:$USER_UID:$USERNAME User:${HOMEDIR}:/bin/sh" >> 
     mkdir -p /home/$USERNAME && \
     chown -R $USER_UID:$USER_UID /home/$USERNAME
 
-RUN dnf install -y findutils
-RUN find ${HOMEDIR}
-
 USER ${USERNAME}
 ENV USERNAME=${USERNAME}
 ENV HOMEDIR=${HOMEDIR}
@@ -42,8 +39,5 @@ ENV PATH="${JAVA_HOME}/bin:${PATH}"
 ENV APP_DIR="${APP_DIR}"
 
 
-
 WORKDIR "${APP_DIR}"
-RUN find .
-RUN pwd
 ENTRYPOINT ["java", "-jar", "quarkus-run.jar"]

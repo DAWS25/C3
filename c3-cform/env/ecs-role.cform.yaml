@@ -1,4 +1,4 @@
-Description: CloudFormation template for ECS Task Execution Role
+Description: ECS Task Execution Role
 
 Parameters:
   EnvId:
@@ -29,6 +29,7 @@ Resources:
       Tags:
         - Key: EnvId
           Value: !Ref EnvId
+
 Outputs:
   ExecutionRoleArn:
     Description: The ARN of the ECS Task Execution Role

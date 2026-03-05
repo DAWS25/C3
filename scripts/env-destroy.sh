@@ -4,14 +4,14 @@ set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 pushd "$DIR/.." >/dev/null
 
-ENV_ID=${ENV_ID:-"c3-local"}
-TENANT_ID=${TENANT_ID:-"$ENV_ID"}
+ENV_ID=${ENV_ID:-"local"}
+TENANT_ID=${TENANT_ID:-"c3"}
+STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
 
-WEB_DISTRIBUTION_STACK="$ENV_ID-web-distribution-stack"
-ALB_SERVICES_STACK="$ENV_ID-alb-services-stack"
-ECS_CLUSTER_STACK="$ENV_ID-ecs-cluster-stack"
-ACM_CERT_STACK="$TENANT_ID-acm-cert-stack"
-WEB_BUCKET_STACK="$ENV_ID-web-bucket-stack"
+ALB_SERVICES_STACK="$STACK_PREFIX-alb-services-stack"
+ECS_CLUSTER_STACK="$STACK_PREFIX-ecs-cluster-stack"
+ECS_ROLE_STACK="$STACK_PREFIX-ecs-role-stack"
+WEB_BUCKET_STACK="$STACK_PREFIX-web-bucket-stack"
 
 stack_exists() {
 	local stack_name="$1"
@@ -30,12 +30,11 @@ delete_stack_if_exists() {
 	fi
 }
 
-echo "## Destroying env stacks for ENV_ID=$ENV_ID"
+echo "## Destroying env stacks for TENANT_ID=$TENANT_ID ENV_ID=$ENV_ID"
 
-delete_stack_if_exists "$WEB_DISTRIBUTION_STACK"
 delete_stack_if_exists "$ALB_SERVICES_STACK"
 delete_stack_if_exists "$ECS_CLUSTER_STACK"
-delete_stack_if_exists "$ACM_CERT_STACK"
+delete_stack_if_exists "$ECS_ROLE_STACK"
 
 if stack_exists "$WEB_BUCKET_STACK"; then
 	BUCKET_NAME=$(aws cloudformation describe-stacks \

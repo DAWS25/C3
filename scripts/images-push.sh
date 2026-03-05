@@ -10,7 +10,8 @@ export AWS_PAGER=""
 
 export VERSION_X=$(cat version.x.txt)
 export VERSION_Y=$(cat version.y.txt)
-export VERSION_Z=$(date +%Y%m%d%H%M%S)
+echo "$(date +%Y%m%d%H%M%S)" > version.z.txt
+export VERSION_Z=$(cat version.z.txt)
 export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
 export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"
 echo "Build and push images started for version[$BUILD_VERSION] using command[$DOCKER_CMD]"
@@ -49,10 +50,14 @@ if [ "$SKIP_PUSH" == "false" ]; then
     echo "Pushing images"
     export REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     $DOCKER_CMD tag $C3_UBI_TAG $REGISTRY_URI/$C3_UBI_TAG
-    $DOCKER_CMD push $REGISTRY_URI/$C3_UBI_TAG  
+    $DOCKER_CMD push $REGISTRY_URI/$C3_UBI_TAG
+    echo "Pushed image URI: $REGISTRY_URI/$C3_UBI_TAG"
+    echo "ECR URL: https://${AWS_REGION}.console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/c3-ubi?region=${AWS_REGION}"
 
     $DOCKER_CMD tag $C3_API_TAG $REGISTRY_URI/$C3_API_TAG
     $DOCKER_CMD push $REGISTRY_URI/$C3_API_TAG
+    echo "Pushed image URI: $REGISTRY_URI/$C3_API_TAG"
+    echo "ECR URL: https://${AWS_REGION}.console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/c3-api?region=${AWS_REGION}"
 fi
 
 echo "Push images completed for version $VERSION"
