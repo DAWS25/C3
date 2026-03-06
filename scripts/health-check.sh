@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-pushd "$DIR/.."
+pushd "$DIR/.." >/dev/null
 echo "script [$0] started"
-##
 
-CURL_CMD="curl  "
-BASE_URL="http://127.0.0.1:10274"
+# Usage:
+#   BASE_URL=https://local.c3.daws25.com ./scripts/health-check.sh
+BASE_URL=${BASE_URL:-"http://127.0.0.1:10274"}
 
-$CURL_CMD $BASE_URL/api
-echo ""
+check_200() {
+	local path="$1"
+	local url="${BASE_URL}${path}"
+	local code
 
-$CURL_CMD $BASE_URL/api/q/health
-echo ""
+	code=$(curl -sS -o /dev/null -w "%{http_code}" "$url")
+	if [[ "$code" != "200" ]]; then
+		echo "FAIL $url -> HTTP $code"
+		exit 1
+	fi
 
-$CURL_CMD $BASE_URL/api/q/health/live
-echo ""
+	echo "OK   $url -> HTTP 200"
+}
 
-$CURL_CMD $BASE_URL/api/q/health/ready
-echo ""
+check_200 "/api"
+check_200 "/kapi"
 
-$CURL_CMD $BASE_URL/api/q/health/started
-echo ""
-
-##
-popd
+popd >/dev/null
 echo "script [$0] completed"
