@@ -10,10 +10,10 @@ echo "script [$0] started"
 # ./mvnw package -Dnative -DskipTests -Dquarkus.native.container-build=true
 # popd
 
-# echo "Building C3 web application..."
-# pushd c3-web
-# npm run build
-# popd
+echo "Building C3 web application..."
+pushd c3-web
+npm run build
+popd
 
 echo "Building and pushing C3 images"
 ./scripts/images-push.sh

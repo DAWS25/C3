@@ -5,6 +5,11 @@ pushd "$DIR/.."
 echo "script [$0] started"
 ##
 
+pushd c3-web
+echo "Building C3 web application dir[$(pwd)]"
+npm run build
+popd
+
 pushd c3-api
 echo "Building API image dir[$(pwd)]"
 mvn
@@ -13,3 +18,4 @@ popd
 ##
 popd
 echo "script [$0] completed"
+

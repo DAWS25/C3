@@ -21,51 +21,37 @@ cleanup_tenant_hosted_zone_records() {
     fi
 
     echo "Cleaning hosted zone records before deletion: $zone_id"
-    AWS_PAGER="" aws route53 list-resource-record-sets --hosted-zone-id "$zone_id" --output json | \
-        python3 -c '
-import json
-import subprocess
-import sys
 
-zone_id = sys.argv[1]
-data = json.load(sys.stdin)
-records = data.get("ResourceRecordSets", [])
+    local apex_name
+    local changes_count
+    local query
+    local delete_batch
 
-apex_name = ""
-for record in records:
-    if record.get("Type") in ("SOA", "NS"):
-        apex_name = record.get("Name", "")
-        break
+    apex_name=$(aws route53 get-hosted-zone \
+        --id "$zone_id" \
+        --query "HostedZone.Name" \
+        --output text)
 
-for record in records:
-    record_name = record.get("Name", "")
-    record_type = record.get("Type", "")
-    if record_name == apex_name and record_type in ("SOA", "NS"):
-        continue
+    query="ResourceRecordSets[?!(Name=='${apex_name}' && (Type=='NS' || Type=='SOA'))]"
 
-    batch = {
-        "Comment": "Cleanup records for hosted-zone stack deletion",
-        "Changes": [
-            {
-                "Action": "DELETE",
-                "ResourceRecordSet": record,
-            }
-        ],
-    }
+    changes_count=$(aws route53 list-resource-record-sets \
+        --hosted-zone-id "$zone_id" \
+        --query "length(${query})" \
+        --output text)
 
-    subprocess.run(
-        [
-            "aws",
-            "route53",
-            "change-resource-record-sets",
-            "--hosted-zone-id",
-            zone_id,
-            "--change-batch",
-            json.dumps(batch),
-        ],
-        check=False,
-    )
-' "$zone_id"
+    if [[ "$changes_count" == "0" ]]; then
+        echo "No non-default records found in hosted zone: $zone_id"
+        return
+    fi
+
+    delete_batch=$(aws route53 list-resource-record-sets \
+        --hosted-zone-id "$zone_id" \
+        --output json \
+        --query "{Comment: 'Cleanup records for hosted-zone stack deletion', Changes: ${query}[].{Action: 'DELETE', ResourceRecordSet: @}}")
+
+    aws route53 change-resource-record-sets \
+        --hosted-zone-id "$zone_id" \
+        --change-batch "$delete_batch"
 }
 
 # Delete all stacks whose name starts with TENANT_ID in reverse order of creation.
