@@ -26,6 +26,11 @@ Resources:
           ToPort: 10274
           SourceSecurityGroupId:
             Fn::ImportValue: !Sub '${EnvId}-ALBSecurityGroupId'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref EKSClusterSecurityGroup
+          Description: Allow HTTPS for VPC endpoints
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -76,6 +81,47 @@ Resources:
         - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet3Id'
       Selectors:
         - Namespace: kube-system
+
+  # VPC Endpoints for ECR access from isolated subnets
+  ECRApiVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub '${TenantId}-VpcId'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet1Id'
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet2Id'
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet3Id'
+      SecurityGroupIds:
+        - !Ref EKSClusterSecurityGroup
+
+  ECRDkrVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub '${TenantId}-VpcId'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet1Id'
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet2Id'
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedSubnet3Id'
+      SecurityGroupIds:
+        - !Ref EKSClusterSecurityGroup
+
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub '${TenantId}-VpcId'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - Fn::ImportValue: !Sub '${TenantId}-IsolatedRouteTableId'
 
 Outputs:
   EKSClusterName:

@@ -12,20 +12,21 @@ STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
 AWS_REGION=${AWS_REGION:-$(aws configure get region)}
 AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}
 
-C3_API_REPOSITORY_URI=${C3_API_REPOSITORY_URI:-"${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/c3-api"}
-C3_API_IMAGE_VERSION=${C3_API_IMAGE_VERSION:-"$(cat version.x.txt).$(cat version.y.txt).$(cat version.z.txt)"}
-C3_API_IMAGE_URI=${C3_API_IMAGE_URI:-"$C3_API_REPOSITORY_URI:$C3_API_IMAGE_VERSION"}
+C3_KAPI_REPOSITORY_URI=${C3_KAPI_REPOSITORY_URI:-"${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/c3-api"}
+C3_KAPI_IMAGE_VERSION=${C3_KAPI_IMAGE_VERSION:-"$(cat version.x.txt).$(cat version.y.txt).$(cat version.z.txt)"}
+C3_KAPI_IMAGE_URI=${C3_KAPI_IMAGE_URI:-"$C3_KAPI_REPOSITORY_URI:$C3_KAPI_IMAGE_VERSION"}
 
-KAPI_STACK_NAME="$STACK_PREFIX-kapi-stack"
-KAPI_SERVICE_NAME=${KAPI_SERVICE_NAME:-"kapi"}
-KAPI_NAMESPACE=${KAPI_NAMESPACE:-"default"}
-KAPI_CONTAINER_PORT=${KAPI_CONTAINER_PORT:-"10274"}
-KAPI_REPLICAS=${KAPI_REPLICAS:-"1"}
-KAPI_PATH_PATTERNS=${KAPI_PATH_PATTERNS:-"/kapi,/kapi/*"}
-KAPI_HEALTH_CHECK_PATH=${KAPI_HEALTH_CHECK_PATH:-"/kapi/"}
-KAPI_LISTENER_RULE_PRIORITY=${KAPI_LISTENER_RULE_PRIORITY:-"2049"}
-KAPI_INDEX_MESSAGE=${KAPI_INDEX_MESSAGE:-"Welcome to C3 KAPI on EKS"}
-KAPI_EKS_CLUSTER_NAME=${KAPI_EKS_CLUSTER_NAME:-"${ENV_ID}-eks-cluster"}
+C3_KAPI_STACK_NAME="$STACK_PREFIX-kapi-stack"
+C3_KAPI_SERVICE_NAME=${C3_KAPI_SERVICE_NAME:-"kapi"}
+C3_KAPI_NAMESPACE=${C3_KAPI_NAMESPACE:-"default"}
+C3_KAPI_CONTAINER_PORT=${C3_KAPI_CONTAINER_PORT:-"10274"}
+C3_KAPI_REPLICAS=${C3_KAPI_REPLICAS:-"1"}
+C3_KAPI_PATH_PATTERNS=${C3_KAPI_PATH_PATTERNS:-"/kapi,/kapi/*"}
+C3_KAPI_HEALTH_CHECK_PATH=${C3_KAPI_HEALTH_CHECK_PATH:-"/kapi/"}
+C3_KAPI_ROOT_PATH=${C3_KAPI_ROOT_PATH:-"/kapi"}
+C3_KAPI_LISTENER_RULE_PRIORITY=${C3_KAPI_LISTENER_RULE_PRIORITY:-"2049"}
+C3_KAPI_INDEX_MESSAGE=${C3_KAPI_INDEX_MESSAGE:-"Welcome to C3 KAPI on EKS"}
+C3_KAPI_EKS_CLUSTER_NAME=${C3_KAPI_EKS_CLUSTER_NAME:-"${ENV_ID}-eks-cluster"}
 KUBECONFIG_PATH=${KUBECONFIG_PATH:-"/tmp/${ENV_ID}-eks-kubeconfig"}
 
 if ! command -v kubectl >/dev/null 2>&1; then
@@ -33,74 +34,75 @@ if ! command -v kubectl >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "Deploying kapi workload to EKS cluster: $KAPI_EKS_CLUSTER_NAME"
-AWS_PAGER="" aws eks update-kubeconfig --name "$KAPI_EKS_CLUSTER_NAME" --region "$AWS_REGION" --kubeconfig "$KUBECONFIG_PATH" >/dev/null
+echo "Deploying kapi workload to EKS cluster: $C3_KAPI_EKS_CLUSTER_NAME"
+AWS_PAGER="" aws eks update-kubeconfig --name "$C3_KAPI_EKS_CLUSTER_NAME" --region "$AWS_REGION" --kubeconfig "$KUBECONFIG_PATH" >/dev/null
 export KUBECONFIG="$KUBECONFIG_PATH"
 
-kubectl -n "$KAPI_NAMESPACE" create deployment "$KAPI_SERVICE_NAME" \
-    --image="$C3_API_IMAGE_URI" \
-    --replicas="$KAPI_REPLICAS" \
-    --port="$KAPI_CONTAINER_PORT" \
+kubectl -n "$C3_KAPI_NAMESPACE" create deployment "$C3_KAPI_SERVICE_NAME" \
+    --image="$C3_KAPI_IMAGE_URI" \
+    --replicas="$C3_KAPI_REPLICAS" \
+    --port="$C3_KAPI_CONTAINER_PORT" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n "$KAPI_NAMESPACE" set env deployment/"$KAPI_SERVICE_NAME" \
-    C3_INDEX_MESSAGE="$KAPI_INDEX_MESSAGE"
+kubectl -n "$C3_KAPI_NAMESPACE" set env deployment/"$C3_KAPI_SERVICE_NAME" \
+    C3_INDEX_MESSAGE="$C3_KAPI_INDEX_MESSAGE" \
+    QUARKUS_HTTP_ROOT_PATH="$C3_KAPI_ROOT_PATH"
 
-kubectl -n "$KAPI_NAMESPACE" create service clusterip "$KAPI_SERVICE_NAME" \
-    --tcp="$KAPI_CONTAINER_PORT:$KAPI_CONTAINER_PORT" \
+kubectl -n "$C3_KAPI_NAMESPACE" create service clusterip "$C3_KAPI_SERVICE_NAME" \
+    --tcp="$C3_KAPI_CONTAINER_PORT:$C3_KAPI_CONTAINER_PORT" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n "$KAPI_NAMESPACE" rollout status deployment/"$KAPI_SERVICE_NAME" --timeout=300s
+kubectl -n "$C3_KAPI_NAMESPACE" rollout status deployment/"$C3_KAPI_SERVICE_NAME" --timeout=300s
 
-echo "Deploying kapi ALB routing stack: $KAPI_STACK_NAME"
+echo "Deploying kapi ALB routing stack: $C3_KAPI_STACK_NAME"
 aws cloudformation deploy \
-    --stack-name "$KAPI_STACK_NAME" \
+    --stack-name "$C3_KAPI_STACK_NAME" \
     --template-file c3-cform/service/kapi-eks-alb-service.cform.yaml \
     --parameter-overrides \
         TenantId="$TENANT_ID" \
         EnvId="$ENV_ID" \
-        ServiceName="$KAPI_SERVICE_NAME" \
-        ContainerPort="$KAPI_CONTAINER_PORT" \
-        PathPatterns="$KAPI_PATH_PATTERNS" \
-        HealthCheckPath="$KAPI_HEALTH_CHECK_PATH" \
-        ListenerRulePriority="$KAPI_LISTENER_RULE_PRIORITY"
+        ServiceName="$C3_KAPI_SERVICE_NAME" \
+        ContainerPort="$C3_KAPI_CONTAINER_PORT" \
+        PathPatterns="$C3_KAPI_PATH_PATTERNS" \
+        HealthCheckPath="$C3_KAPI_HEALTH_CHECK_PATH" \
+        ListenerRulePriority="$C3_KAPI_LISTENER_RULE_PRIORITY"
 
-KAPI_TARGET_GROUP_ARN=$(aws cloudformation describe-stacks \
-    --stack-name "$KAPI_STACK_NAME" \
+C3_KAPI_TARGET_GROUP_ARN=$(aws cloudformation describe-stacks \
+    --stack-name "$C3_KAPI_STACK_NAME" \
     --query "Stacks[0].Outputs[?OutputKey=='KapiTargetGroupArn'].OutputValue|[0]" \
     --output text)
 
-if [[ -z "$KAPI_TARGET_GROUP_ARN" || "$KAPI_TARGET_GROUP_ARN" == "None" ]]; then
-    echo "ERROR: Unable to resolve KapiTargetGroupArn from stack $KAPI_STACK_NAME"
+if [[ -z "$C3_KAPI_TARGET_GROUP_ARN" || "$C3_KAPI_TARGET_GROUP_ARN" == "None" ]]; then
+    echo "ERROR: Unable to resolve KapiTargetGroupArn from stack $C3_KAPI_STACK_NAME"
     exit 1
 fi
 
-POD_IPS=$(kubectl -n "$KAPI_NAMESPACE" get pods -l app="$KAPI_SERVICE_NAME" -o jsonpath='{range .items[*]}{.status.podIP}{" "}{end}')
+POD_IPS=$(kubectl -n "$C3_KAPI_NAMESPACE" get pods -l app="$C3_KAPI_SERVICE_NAME" -o jsonpath='{range .items[*]}{.status.podIP}{" "}{end}')
 if [[ -z "$POD_IPS" ]]; then
-    echo "ERROR: No pod IPs found for label app=$KAPI_SERVICE_NAME in namespace $KAPI_NAMESPACE"
+    echo "ERROR: No pod IPs found for label app=$C3_KAPI_SERVICE_NAME in namespace $C3_KAPI_NAMESPACE"
     exit 1
 fi
 
 EXISTING_TARGETS=$(aws elbv2 describe-target-health \
-    --target-group-arn "$KAPI_TARGET_GROUP_ARN" \
+    --target-group-arn "$C3_KAPI_TARGET_GROUP_ARN" \
     --query 'TargetHealthDescriptions[].Target.Id' \
     --output text 2>/dev/null || true)
 
 for existing_target in $EXISTING_TARGETS; do
     aws elbv2 deregister-targets \
-        --target-group-arn "$KAPI_TARGET_GROUP_ARN" \
-        --targets "Id=$existing_target,Port=$KAPI_CONTAINER_PORT" >/dev/null || true
+        --target-group-arn "$C3_KAPI_TARGET_GROUP_ARN" \
+        --targets "Id=$existing_target,Port=$C3_KAPI_CONTAINER_PORT" >/dev/null || true
 done
 
 for pod_ip in $POD_IPS; do
-    echo "Registering kapi pod target: $pod_ip:$KAPI_CONTAINER_PORT"
+    echo "Registering kapi pod target: $pod_ip:$C3_KAPI_CONTAINER_PORT"
     aws elbv2 register-targets \
-        --target-group-arn "$KAPI_TARGET_GROUP_ARN" \
-        --targets "Id=$pod_ip,Port=$KAPI_CONTAINER_PORT"
+        --target-group-arn "$C3_KAPI_TARGET_GROUP_ARN" \
+        --targets "Id=$pod_ip,Port=$C3_KAPI_CONTAINER_PORT"
 done
 
 echo "kapi target health status:"
-aws elbv2 describe-target-health --target-group-arn "$KAPI_TARGET_GROUP_ARN"
+aws elbv2 describe-target-health --target-group-arn "$C3_KAPI_TARGET_GROUP_ARN"
 
 popd >/dev/null
 echo "Script [$0] completed"

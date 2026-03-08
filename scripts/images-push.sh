@@ -10,8 +10,7 @@ export AWS_PAGER=""
 
 export VERSION_X=$(cat version.x.txt)
 export VERSION_Y=$(cat version.y.txt)
-echo "$(date +%H%M%S)" > version.z.txt
-export VERSION_Z=$(cat version.z.txt)
+export VERSION_Z=$(date +%H%M%S)
 export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
 export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"
 echo "Build and push images started for version[$BUILD_VERSION] using command[$DOCKER_CMD]"
@@ -44,7 +43,6 @@ echo "Building C3 API image"
 C3_API_TAG="c3-api:$BUILD_VERSION"
 $DOCKER_CMD build $BUILD_XARGS -f c3-api/Containerfile -t $C3_API_TAG .
 
-
 SKIP_PUSH=${SKIP_PUSH:-"false"}
 if [ "$SKIP_PUSH" == "false" ]; then
     echo "Pushing images"
@@ -60,7 +58,9 @@ if [ "$SKIP_PUSH" == "false" ]; then
     echo "ECR URL: https://${AWS_REGION}.console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/c3-api?region=${AWS_REGION}"
 fi
 
-echo "Push images completed for version $VERSION"
+echo "$VERSION_Z" > version.z.txt
+
+echo "Build and push images completed for version $VERSION"
 echo "# Check the build image:"
 echo "docker run -it --rm $C3_BUILD_TAG bash"
 

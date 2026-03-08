@@ -47,6 +47,11 @@ Parameters:
     Default: /api/
     Description: ALB target group health check path
 
+  QuarkusHttpRootPath:
+    Type: String
+    Default: /api
+    Description: QUARKUS_HTTP_ROOT_PATH for the API container
+
   ListenerRulePriority:
     Type: Number
     Default: 2048
@@ -75,6 +80,8 @@ Resources:
           Environment:
             - Name: C3_INDEX_MESSAGE
               Value: !Ref C3IndexMessage
+            - Name: QUARKUS_HTTP_ROOT_PATH
+              Value: !Ref QuarkusHttpRootPath
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
