@@ -1,43 +1,73 @@
-# Build image:
-# docker build --no-cache --progress=plain -f c3-ubi/Containerfile -t c3/c3-ubi:$(cat version.x.txt).$(cat version.y.txt) . 
-# podman build --no-cache --progress=plain -f c3-ubi/Containerfile -t c3/c3-ubi:$(cat version.x.txt).$(cat version.y.txt) . 
+# This is the Containerfile for the c3-ubi image. It is used to build the c3-ubi image, which is a base image for the c3 application. It is based on the Amazon Corretto 25 JDK image, which is a UBI image. The c3-ubi image includes the necessary dependencies for building and running the c3 application, such as Maven and Node.js. The image also includes a minimal JRE created with jlink, which reduces the size of the image.
 
-# Log in, tag and push to ECR:
+# IMAGE_NAME=c3-ubi
+
+# Build image:
+# docker build --no-cache --progress=plain -f $IMAGE_NAME/Containerfile -t c3/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt) . 
+# podman build --no-cache --progress=plain -f $IMAGE_NAME/Containerfile -t c3/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt) . 
+
+# Log in to ECR:
 # AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 # AWS_REGION=$(aws configure get region)
 # aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-# docker tag c3-ubi:$(cat version.x.txt).$(cat version.y.txt) $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/c3-ubi:$(cat version.x.txt).$(cat version.y.txt)
-# docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/c3-ubi:$(cat version.x.txt).$(cat version.y.txt)  
 
-# Log in, tag and push to docker hub:
-# docker tag c3-ubi:$(cat version.x.txt).$(cat version.y.txt) $REGISTRY_USERNAME/c3-ubi:$(cat version.x.txt).$(cat version.y.txt)
-# docker push docker.io/$REGISTRY_USERNAME/c3-ubi:$(cat version.x.txt).$(cat version.y.txt)
+# Tag and push to ECR:
+# docker tag $IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt) $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt)
+# docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt)  
+
+# Tag and push to docker hub:
+# docker tag $IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt) $REGISTRY_USERNAME/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt)
+# docker push docker.io/$REGISTRY_USERNAME/$IMAGE_NAME:$(cat version.x.txt).$(cat version.y.txt)
 
 ARG UBI="public.ecr.aws/amazoncorretto/amazoncorretto:25-jdk"
 FROM ${UBI}
 
 # Root level
 USER root
-RUN dnf update -y
-RUN dnf install -y "make" "maven"
+
+# Install Node.js
+RUN curl -fsSL https://rpm.nodesource.com/setup_lts.x | bash - 
+
+# Single-shot DNF layer
+RUN dnf update -y && \
+    dnf install -y "which" "make" "maven" "nodejs" && \
+    dnf clean all 
+
 
 ## Create User
 ARG USERNAME=code
 ENV USERNAME=${USERNAME}
+ENV USERHOME=/home/$USERNAME
 ARG USER_UID=1001
 RUN echo "$USERNAME:x:$USER_UID:$USER_UID:$USERNAME User:/home/$USERNAME:/bin/sh" >> /etc/passwd && \
     echo "$USERNAME:x:$USER_UID:" >> /etc/group && \
-    mkdir -p /home/$USERNAME && \
-    chown -R $USER_UID:$USER_UID /home/$USERNAME
+    mkdir -p $USERHOME && \
+    chown -R $USER_UID:$USER_UID $USERHOME
     
 # User level
 USER $USERNAME
 
-# Jlink pre-build
+# Jlink minimal JRE
 ARG JAVA_MODULES="java.base,java.compiler,java.desktop,java.logging,java.management,java.naming,java.rmi,java.sql,java.transaction.xa,java.xml,jdk.crypto.ec,jdk.compiler,jdk.unsupported,java.security.jgss,java.security.sasl,java.net.http"
 RUN bash -c "jlink \
     --add-modules "$JAVA_MODULES" \
     --compress=zip-2 \
     --no-header-files \
     --no-man-pages \
-    --output /home/$USERNAME/jre"
+    --output $USERHOME/jre"
+ENV JAVA_HOME=$USERHOME/jre
+RUN mkdir -p $USERHOME/.local/bin; ln -s $USERHOME/jre/bin/java $USERHOME/.local/bin/java
+
+RUN which java && java -version
+RUN which node && node -v
+
+# CONSIDER BUILDING THE APP IN THIS IMAGE AND REMOVING SRC FOR A WARM BUILD
+# Copy source code
+WORKDIR "/home/$USERNAME/src"
+COPY --chown=$USERNAME  . .
+
+ # Run build
+RUN make
+
+# Remove source code to reduce image size and avoid source leaking.
+RUN rm -rf "$USERHOME/src"

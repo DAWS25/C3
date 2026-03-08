@@ -10,7 +10,7 @@ export AWS_PAGER=""
 
 export VERSION_X=$(cat version.x.txt)
 export VERSION_Y=$(cat version.y.txt)
-echo "$(date +%Y%m%d%H%M%S)" > version.z.txt
+echo "$(date +%H%M%S)" > version.z.txt
 export VERSION_Z=$(cat version.z.txt)
 export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
 export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"

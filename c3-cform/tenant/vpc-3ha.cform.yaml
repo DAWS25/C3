@@ -75,6 +75,21 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub ${TenantId}-nat-a
+
   IsolatedRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -84,6 +99,13 @@ Resources:
           Value: !Sub ${TenantId}-isolated-rt
         - Key: Isolation
           Value: isolated
+
+  IsolatedDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref IsolatedRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
 
   PublicSubnet1:
     Type: AWS::EC2::Subnet

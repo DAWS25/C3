@@ -58,7 +58,7 @@ Parameters:
     Description: Message returned by the API index endpoint
 
 Resources:
-  ECS2048TaskDefinition:
+  ECSAPITaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${EnvId}-${ServiceName}"
@@ -86,7 +86,7 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
-  ECS2048SecurityGroup:
+  ECSAPISecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub "${EnvId}-${ServiceName} Security Group"
@@ -104,7 +104,7 @@ Resources:
           ToPort: 0
           CidrIp: 0.0.0.0/0
 
-  ECS2048Service:
+  ECSAPIService:
     Type: AWS::ECS::Service
     Properties:
       ServiceName: !Sub "${EnvId}-${ServiceName}"
@@ -112,7 +112,7 @@ Resources:
         Fn::ImportValue: !Sub "${EnvId}-ECSClusterName"
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
-      TaskDefinition: !Ref ECS2048TaskDefinition
+      TaskDefinition: !Ref ECSAPITaskDefinition
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
@@ -121,15 +121,15 @@ Resources:
             - Fn::ImportValue: !Sub "${TenantId}-PublicSubnet2Id"
             - Fn::ImportValue: !Sub "${TenantId}-PublicSubnet3Id"
           SecurityGroups:
-            - !Ref ECS2048SecurityGroup
+            - !Ref ECSAPISecurityGroup
       LoadBalancers:
         - ContainerName: !Ref ServiceName
           ContainerPort: !Ref ContainerPort
-          TargetGroupArn: !Ref ECS2048TargetGroup
+          TargetGroupArn: !Ref ECSAPITargetGroup
       EnableECSManagedTags: true
       PropagateTags: SERVICE
 
-  ECS2048TargetGroup:
+  ECSAPITargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub "${EnvId}-${ServiceName}"
@@ -154,7 +154,7 @@ Resources:
           Values: !Ref PathPatterns
       Actions:
         - Type: forward
-          TargetGroupArn: !Ref ECS2048TargetGroup
+          TargetGroupArn: !Ref ECSAPITargetGroup
 
   ECSHttpListenerRule2048:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -167,11 +167,11 @@ Resources:
           Values: !Ref PathPatterns
       Actions:
         - Type: forward
-          TargetGroupArn: !Ref ECS2048TargetGroup
+          TargetGroupArn: !Ref ECSAPITargetGroup
 
 Outputs:
-  ECS2048TaskDefinitionRef:
+  ECSAPITaskDefinitionRef:
     Description: The Ref ECS Task Definition
-    Value: !Ref ECS2048TaskDefinition
+    Value: !Ref ECSAPITaskDefinition
     Export:
       Name: !Sub "${EnvId}-${ServiceName}TaskDefinitionRef"

@@ -125,6 +125,9 @@ aws cloudformation deploy \
     --template-file eks-cluster.cform.yaml \
     --parameter-overrides EnvId="$ENV_ID" TenantId="$TENANT_ID"
 
+echo "## updating local kubeconfig for EKS cluster..."
+"$DIR/eks-kubeconfig.sh"
+
 
 popd
 
