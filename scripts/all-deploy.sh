@@ -18,8 +18,7 @@ run_step() {
     echo "==> $label"
     "$script_path"
 }
-
-run_step "Build code" "./scripts/make.sh"
+run_step "Clean source repository" "./scripts/clean.sh"
 run_step "Build and push images" "./scripts/images-push.sh"
 run_step "Deploy tenant tier" "./scripts/tenant-deploy.sh"
 run_step "Deploy environment tier" "./scripts/env-deploy.sh"

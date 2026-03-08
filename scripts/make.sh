@@ -7,6 +7,7 @@ echo "script [$0] started"
 
 pushd c3-web
 echo "Building C3 web application dir[$(pwd)]"
+npm install
 npm run build
 popd
 

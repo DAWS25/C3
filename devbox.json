@@ -4,7 +4,6 @@
     "graalvm-ce@latest",
     "maven@latest",
     "quarkus@latest",
-    "mysql-client@latest",
     "gnumake@latest"
   ],
   "shell": {
