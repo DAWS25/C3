@@ -19,8 +19,8 @@ run_step() {
     "$script_path"
 }
 run_step "Clean source repository" "./scripts/clean.sh"
-run_step "Build and push images" "./scripts/images-push.sh"
 run_step "Deploy tenant tier" "./scripts/tenant-deploy.sh"
+run_step "Build and push images" "./scripts/images-push.sh"
 run_step "Deploy environment tier" "./scripts/env-deploy.sh"
 run_step "Deploy services tier" "./scripts/services-deploy.sh"
 run_step "Deploy distribution tier" "./scripts/distribution-deploy.sh"

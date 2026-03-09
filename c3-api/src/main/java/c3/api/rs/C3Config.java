@@ -7,4 +7,7 @@ import io.smallrye.config.WithDefault;
 public interface C3Config {
     @WithDefault("Welcome to C3 API")
     String indexMessage();
+
+    @WithDefault("0.0.0")
+    String version();
 }

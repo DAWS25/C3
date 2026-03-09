@@ -47,10 +47,15 @@ Parameters:
     Default: /api/
     Description: ALB target group health check path
 
-  QuarkusHttpRootPath:
+  QuarkusHttpPath:
+    Type: String
+    Default: /
+    Description: QUARKUS_HTTP_PATH for the API container
+
+  QuarkusRestPath:
     Type: String
     Default: /api
-    Description: QUARKUS_HTTP_ROOT_PATH for the API container
+    Description: QUARKUS_REST_PATH for the API container
 
   ListenerRulePriority:
     Type: Number
@@ -80,8 +85,10 @@ Resources:
           Environment:
             - Name: C3_INDEX_MESSAGE
               Value: !Ref C3IndexMessage
-            - Name: QUARKUS_HTTP_ROOT_PATH
-              Value: !Ref QuarkusHttpRootPath
+            - Name: QUARKUS_HTTP_PATH
+              Value: !Ref QuarkusHttpPath
+            - Name: QUARKUS_REST_PATH
+              Value: !Ref QuarkusRestPath
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -119,6 +126,7 @@ Resources:
         Fn::ImportValue: !Sub "${EnvId}-ECSClusterName"
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
+      HealthCheckGracePeriodSeconds: 180
       TaskDefinition: !Ref ECSAPITaskDefinition
       NetworkConfiguration:
         AwsvpcConfiguration:
@@ -148,7 +156,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
       Matcher:
-        HttpCode: "200"
+        HttpCode: "200-399"
 
   ECSListenerRule2048:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule

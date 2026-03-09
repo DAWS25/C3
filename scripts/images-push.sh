@@ -12,7 +12,7 @@ export VERSION_X=$(cat version.x.txt)
 export VERSION_Y=$(cat version.y.txt)
 export VERSION_Z=$(date +%H%M%S)
 export UBI_VERSION="${VERSION_X}.${VERSION_Y}"
-export BUILD_VERSION="${UBI_VERSION}.${VERSION_Z}"
+export BUILD_VERSION="${VERSION_X}.${VERSION_Y}.${VERSION_Z}"
 echo "Build and push images started for version[$BUILD_VERSION] using command[$DOCKER_CMD]"
 
 SKIP_PRUNE=${SKIP_PRUNE:-"true"}
@@ -25,6 +25,15 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_REGION=$(aws configure get region)
 echo "Authenticating to ECR Registry for account[$AWS_ACCOUNT_ID] and region[$AWS_REGION]"
 aws ecr get-login-password --region $AWS_REGION | $DOCKER_CMD login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+ecr_tag_exists() {
+    local repository="$1"
+    local tag="$2"
+    aws ecr describe-images \
+        --repository-name "$repository" \
+        --image-ids imageTag="$tag" \
+        --region "$AWS_REGION" >/dev/null 2>&1
+}
 
 echo "Bulding images"
 VERSION_XARGS="--build-arg BUILD_VERSION=${BUILD_VERSION} --build-arg UBI_VERSION=${UBI_VERSION}"
@@ -47,9 +56,13 @@ SKIP_PUSH=${SKIP_PUSH:-"false"}
 if [ "$SKIP_PUSH" == "false" ]; then
     echo "Pushing images"
     export REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-    $DOCKER_CMD tag $C3_UBI_TAG $REGISTRY_URI/$C3_UBI_TAG
-    $DOCKER_CMD push $REGISTRY_URI/$C3_UBI_TAG
-    echo "Pushed image URI: $REGISTRY_URI/$C3_UBI_TAG"
+    if ecr_tag_exists "c3-ubi" "$UBI_VERSION"; then
+        echo "ECR tag already exists and is immutable: c3-ubi:$UBI_VERSION; skipping push"
+    else
+        $DOCKER_CMD tag $C3_UBI_TAG $REGISTRY_URI/$C3_UBI_TAG
+        $DOCKER_CMD push $REGISTRY_URI/$C3_UBI_TAG
+        echo "Pushed image URI: $REGISTRY_URI/$C3_UBI_TAG"
+    fi
     echo "ECR URL: https://${AWS_REGION}.console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/c3-ubi?region=${AWS_REGION}"
 
     $DOCKER_CMD tag $C3_API_TAG $REGISTRY_URI/$C3_API_TAG

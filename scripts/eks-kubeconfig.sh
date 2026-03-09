@@ -16,10 +16,24 @@ fi
 mkdir -p "$(dirname "$KUBECONFIG_PATH")"
 
 echo "Updating kubeconfig for cluster $EKS_CLUSTER_NAME in region $AWS_REGION"
-AWS_PAGER="" aws eks update-kubeconfig \
+set +e
+output=$(AWS_PAGER="" aws eks update-kubeconfig \
     --name "$EKS_CLUSTER_NAME" \
     --region "$AWS_REGION" \
-    --kubeconfig "$KUBECONFIG_PATH" >/dev/null
+    --kubeconfig "$KUBECONFIG_PATH" 2>&1)
+rc=$?
+set -e
+
+if [[ $rc -ne 0 ]]; then
+    if [[ "$output" == *"No cluster found"* ]]; then
+        echo "Cluster $EKS_CLUSTER_NAME does not exist; kubeconfig not updated (OK if EKS cluster is not being deployed)"
+        echo "Script [$0] completed"
+        exit 0
+    else
+        echo "ERROR: Failed to update kubeconfig: $output"
+        exit $rc
+    fi
+fi
 
 echo "Kubeconfig written to: $KUBECONFIG_PATH"
 

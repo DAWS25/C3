@@ -16,14 +16,46 @@ fi
 
 echo "Deploying tenant with TENANT_ID=$TENANT_ID and TENANT_DOMAIN=$TENANT_DOMAIN"
 
+stack_status() {
+    local stack_name="$1"
+    aws cloudformation describe-stacks \
+        --stack-name "$stack_name" \
+        --query 'Stacks[0].StackStatus' \
+        --output text 2>/dev/null || true
+}
+
+wait_for_stack_ready() {
+    local stack_name="$1"
+    local status
+    status=$(stack_status "$stack_name")
+
+    while [[ "$status" == *_IN_PROGRESS || "$status" == *_CLEANUP_IN_PROGRESS ]]; do
+        echo "Stack $stack_name is $status; waiting for it to stabilize..."
+        sleep 20
+        status=$(stack_status "$stack_name")
+    done
+
+    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
+        echo "Deleting rollback-complete stack $stack_name before redeploy"
+        aws cloudformation delete-stack --stack-name "$stack_name"
+        aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
+    fi
+}
+
+deploy_stack_safe() {
+    local stack_name="$1"
+    shift
+    wait_for_stack_ready "$stack_name"
+    aws cloudformation deploy --stack-name "$stack_name" "$@"
+}
+
 TENANT_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$TENANT_DOMAIN" --query "HostedZones[0].Id" --output text | sed 's/\/hostedzone\///')
 if [[ -n "$TENANT_ZONE_ID" && "$TENANT_ZONE_ID" != "None" ]]; then
     echo "Route53 zone for $TENANT_DOMAIN already exists with ID $TENANT_ZONE_ID"
 else
     echo "Creating Route53 hosted zone for $TENANT_DOMAIN"
     R53_STACK_NAME="$TENANT_ID-r53-zone-stack"
-    aws cloudformation deploy \
-        --stack-name "$R53_STACK_NAME" \
+    deploy_stack_safe "$R53_STACK_NAME" \
         --template-file c3-cform/tenant/r53-zone.cform.yaml \
         --parameter-overrides TenantId="$TENANT_ID" DomainName="$TENANT_DOMAIN"
 fi
@@ -45,8 +77,7 @@ if [[ -n "${PARENT_ZONE_ID:-}" ]]; then
     else
         R53_DELEGATION_STACK_NAME="$TENANT_ID-r53-zone-delegation-stack"
         echo "Deploying parent-zone delegation stack $R53_DELEGATION_STACK_NAME with PARENT_ZONE_ID=$PARENT_ZONE_ID"
-        aws cloudformation deploy \
-            --stack-name "$R53_DELEGATION_STACK_NAME" \
+        deploy_stack_safe "$R53_DELEGATION_STACK_NAME" \
             --template-file c3-cform/tenant/r53-zone-delegation.cform.yaml \
             --parameter-overrides \
                 ParentZoneId="$PARENT_ZONE_ID" \
@@ -59,8 +90,7 @@ fi
 
 CERT_STACK_NAME="$TENANT_ID-acm-cert-stack"
 echo "Deploying ACM certificate stack $CERT_STACK_NAME"
-aws cloudformation deploy \
-    --stack-name "$CERT_STACK_NAME" \
+deploy_stack_safe "$CERT_STACK_NAME" \
     --template-file c3-cform/tenant/acm-cert.cform.yaml \
     --parameter-overrides \
         TenantId="$TENANT_ID" \
@@ -69,22 +99,19 @@ aws cloudformation deploy \
 
 REPOSITORY_NAME="c3-ubi"
 echo "Deploying ECR repository stack $TENANT_ID-ecr-$REPOSITORY_NAME"
-aws cloudformation deploy \
-    --stack-name "$TENANT_ID-ecr-$REPOSITORY_NAME" \
+deploy_stack_safe "$TENANT_ID-ecr-$REPOSITORY_NAME" \
     --template-file c3-cform/tenant/ecr-repository.cform.yaml \
     --parameter-overrides RepositoryName="$REPOSITORY_NAME"
 
 REPOSITORY_NAME="c3-api"
 echo "Deploying ECR repository stack $TENANT_ID-ecr-$REPOSITORY_NAME"
-aws cloudformation deploy \
-    --stack-name "$TENANT_ID-ecr-$REPOSITORY_NAME" \
+deploy_stack_safe "$TENANT_ID-ecr-$REPOSITORY_NAME" \
     --template-file c3-cform/tenant/ecr-repository.cform.yaml \
     --parameter-overrides RepositoryName="$REPOSITORY_NAME"
 
 VPC_STACK_NAME="$TENANT_ID-vpc-3ha-stack"
 echo "Deploying VPC stack $VPC_STACK_NAME"
-aws cloudformation deploy \
-    --stack-name "$VPC_STACK_NAME" \
+deploy_stack_safe "$VPC_STACK_NAME" \
     --template-file c3-cform/tenant/vpc-3ha.cform.yaml \
     --parameter-overrides TenantId="$TENANT_ID"
 
