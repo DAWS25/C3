@@ -37,6 +37,14 @@ Parameters:
     Default: 1
     Description: Desired ECS service task count
 
+  AssignPublicIp:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: Whether to assign public IPs to Fargate tasks
+
   PathPatterns:
     Type: CommaDelimitedList
     Default: "/,/*"
@@ -130,7 +138,7 @@ Resources:
       TaskDefinition: !Ref ECSAPITaskDefinition
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
+          AssignPublicIp: !Ref AssignPublicIp
           Subnets:
             - Fn::ImportValue: !Sub "${TenantId}-PublicSubnet1Id"
             - Fn::ImportValue: !Sub "${TenantId}-PublicSubnet2Id"

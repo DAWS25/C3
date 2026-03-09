@@ -1,7 +1,11 @@
 package c3.api.rs;
 
 import org.jboss.resteasy.reactive.NoCache;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -13,14 +17,14 @@ public class RootResource {
     @Inject
     C3Config config;
 
-    @ConfigProperty(name = "quarkus.http.root-path") 
+    @ConfigProperty(name = "quarkus.http.root-path", defaultValue = "/")
     String httpPath;
-    @ConfigProperty(name = "quarkus.rest.path") 
+    @ConfigProperty(name = "quarkus.rest.path", defaultValue = "/")
     String restPath;
 
     public void init(@Observes StartupEvent ev) {
-        Log.info("C3 API version[%s] initialized. message[%s]", config.version(), config.indexMessage());
-        Log.info("HTTP paths root[%s] rest[%s]", httpPath, restPath);
+        Log.infof("C3 API version[%s] initialized. message[%s]", config.version(), config.indexMessage());
+        Log.infof("HTTP paths root[%s] rest[%s]", httpPath, restPath);
     }
 
     @GET
