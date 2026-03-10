@@ -42,6 +42,7 @@ Resources:
         SigningProtocol: sigv4
         Description: !Sub "Origin Access Control for ${AWS::StackName}"
 
+
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -123,6 +124,28 @@ Resources:
               Cookies:
                 Forward: all
           - PathPattern: /kapi/*
+            TargetOriginId: ALBOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - PATCH
+              - POST
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - "*"
+              Cookies:
+                Forward: all
+          - PathPattern: /kapi
             TargetOriginId: ALBOrigin
             ViewerProtocolPolicy: https-only
             AllowedMethods:

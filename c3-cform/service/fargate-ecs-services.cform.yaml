@@ -93,7 +93,7 @@ Resources:
           Environment:
             - Name: C3_INDEX_MESSAGE
               Value: !Ref C3IndexMessage
-            - Name: QUARKUS_HTTP_PATH
+            - Name: QUARKUS_HTTP_ROOT_PATH
               Value: !Ref QuarkusHttpPath
             - Name: QUARKUS_REST_PATH
               Value: !Ref QuarkusRestPath
@@ -105,6 +105,7 @@ Resources:
             Options:
               awslogs-group:
                 Fn::ImportValue: !Sub "${EnvId}-AppLogGroupName"
+              awslogs-create-group: "true"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 

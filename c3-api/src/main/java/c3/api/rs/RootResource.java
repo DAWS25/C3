@@ -31,6 +31,7 @@ public class RootResource {
     @Produces(MediaType.TEXT_PLAIN)
     @NoCache
     public String get() {
-        return config.indexMessage();
+        var message = "C3 API v[" + config.version() + "] \n" + config.indexMessage();
+        return message;
     }
 }
