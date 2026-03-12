@@ -10,7 +10,7 @@ echo "script [$0] started"
 # Try to get CloudFormation output, fallback to localhost
 ENV_ID=${ENV_ID:-local}
 TENANT_ID=${TENANT_ID:-"c3"}
-STACK_NAME="${TENANT_ID}-${ENV_ID}-web-distribution-dns-alias-stack"
+STACK_NAME="${TENANT_ID}-${ENV_ID}-web-distribution-dns-stack"
 echo "Checking CloudFormation stack: $STACK_NAME"
 cf_output=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].Outputs[0].OutputValue' --output text 2>/dev/null) || cf_output=""
 if [[ -n "$cf_output" ]]; then

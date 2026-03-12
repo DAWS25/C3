@@ -86,7 +86,7 @@ if [[ -z "$CERTIFICATE_ARN" || "$CERTIFICATE_ARN" == "None" ]]; then
 fi
 
 DISTRIBUTION_STACK_NAME="$STACK_PREFIX-web-distribution-stack"
-DISTRIBUTION_DNS_ALIAS_STACK_NAME="$STACK_PREFIX-web-distribution-dns-alias-stack"
+DISTRIBUTION_DNS_ALIAS_STACK_NAME="$STACK_PREFIX-web-distribution-dns-stack"
 delete_stack_if_stale "$DISTRIBUTION_STACK_NAME"
 delete_stack_if_stale "$DISTRIBUTION_DNS_ALIAS_STACK_NAME"
 echo "## Deploying DISTRIBUTION stack..."
