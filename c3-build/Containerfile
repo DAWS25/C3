@@ -1,14 +1,14 @@
 ARG BASE_IMAGE="c3-ubi"
 ARG UBI_VERSION="0.0"
-ARG USERNAME="code"
+ARG USER_NAME="code"
 
 FROM ${BASE_IMAGE}:${UBI_VERSION}
 
-ENV USERNAME=${USERNAME}
+ENV USER_NAME=${USER_NAME}
 
 # Copy source code
-WORKDIR "/home/$USERNAME/src"
-COPY --chown=$USERNAME  . .
+WORKDIR "/home/${USER_NAME}/src"
+COPY --chown=${USER_NAME} . .
 
  # Run build
 RUN make

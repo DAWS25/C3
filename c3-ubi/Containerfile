@@ -35,15 +35,21 @@ RUN dnf update -y && \
 
 
 ## Create User
-ARG USER_NAME=code
-ENV USER_NAME=${USER_NAME}
-ENV USER_HOME=/home/$USER_NAME
-ARG USER_UID=1001
+ARG USER_NAME="code"
+ENV USER_NAME="${USER_NAME}"
+ARG USER_HOME="/home/${USER_NAME}"
+ENV USER_HOME="${USER_HOME}"
+ARG USER_UID="1001"
 RUN echo "$USER_NAME:x:$USER_UID:$USER_UID:$USER_NAME User:/home/$USER_NAME:/bin/sh" >> /etc/passwd && \
     echo "$USER_NAME:x:$USER_UID:" >> /etc/group && \
     mkdir -p $USER_HOME && \
-    chown -R $USER_UID:$USER_UID $USER_HOME
-    
+    chown -R "$USER_UID:$USER_UID" "$USER_HOME"
+
+RUN bash -c "\
+    echo Initializing UBI user_home[${USER_HOME}] && \
+    mkdir -p $USER_HOME/.local/bin && \
+    ln -s $USER_HOME/jre/bin/java $USER_HOME/.local/bin/java"
+
 # User level
 USER $USER_NAME
 
@@ -71,9 +77,7 @@ RUN bash -c "jlink \
     --compress=zip-2 \
     --no-header-files \
     --no-man-pages \
-    --output $USER_HOME/jre && \
-mkdir -p $USER_HOME/.local/bin && \
-ln -s $USER_HOME/jre/bin/java $USER_HOME/.local/bin/java"
+    --output $USER_HOME/jre"
 
 ENV JAVA_HOME=$USER_HOME/jre
 
@@ -86,4 +90,4 @@ WORKDIR "/home/$USER_NAME/src"
 COPY --chown=$USER_NAME  . .
 
  # Run build
-RUN bash -c "make; rm -rf \"$USER_HOME/src/*\""
+RUN bash -c "echo user_home=${USER_HOME}; rm -rf \"$USER_HOME/src/*\""
