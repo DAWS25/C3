@@ -16,11 +16,27 @@ Parameters:
     Description: Custom domain name for the CloudFront distribution (e.g., oto.example.com)
     AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$
 
+  ApiDomainName:
+    Type: String
+    Description: DNS name used by CloudFront to reach the API origin (ALB)
+    AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$
+
   CertificateArn:
     Type: String
     Description: ARN of the SSL certificate in ACM (must be in us-east-1 for CloudFront)
     AllowedPattern: ^arn:aws:acm:us-east-1:[0-9]{12}:certificate\/[a-f0-9-]+$
     ConstraintDescription: Must be a valid ACM certificate ARN in us-east-1 region
+
+  Enabled:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether the CloudFront distribution is enabled
+
+Conditions:
+  DistributionEnabled: !Equals [!Ref Enabled, "true"]
 
 Resources:
   DistributionBucket:
@@ -47,9 +63,12 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Enabled: !If [DistributionEnabled, true, false]
         Aliases:
           - !Ref DomainName
-        Comment: !Sub "OTO static distribution for ${DomainName}"
+        
+        Comment: !Sub "Static distribution for ${DomainName}"
+        
         DefaultCacheBehavior:
           TargetOriginId: ALBOrigin
           ViewerProtocolPolicy: https-only
@@ -72,21 +91,8 @@ Resources:
               - "*"
             Cookies:
               Forward: all
+
         CacheBehaviors:
-          - PathPattern: /app
-            TargetOriginId: S3Origin
-            ViewerProtocolPolicy: https-only
-            AllowedMethods:
-              - GET
-              - HEAD
-            CachedMethods:
-              - GET
-              - HEAD
-            Compress: true
-            ForwardedValues:
-              QueryString: false
-              Cookies:
-                Forward: none
           - PathPattern: /app/*
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: https-only
@@ -98,76 +104,10 @@ Resources:
               - HEAD
             Compress: true
             ForwardedValues:
-              QueryString: false
-              Cookies:
-                Forward: none
-          - PathPattern: /api/*
-            TargetOriginId: ALBOrigin
-            ViewerProtocolPolicy: https-only
-            AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-              - PUT
-              - PATCH
-              - POST
-              - DELETE
-            CachedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-            Compress: true
-            ForwardedValues:
               QueryString: true
-              Headers:
-                - "*"
               Cookies:
                 Forward: all
-          - PathPattern: /kapi/*
-            TargetOriginId: ALBOrigin
-            ViewerProtocolPolicy: https-only
-            AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-              - PUT
-              - PATCH
-              - POST
-              - DELETE
-            CachedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-            Compress: true
-            ForwardedValues:
-              QueryString: true
-              Headers:
-                - "*"
-              Cookies:
-                Forward: all
-          - PathPattern: /kapi
-            TargetOriginId: ALBOrigin
-            ViewerProtocolPolicy: https-only
-            AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-              - PUT
-              - PATCH
-              - POST
-              - DELETE
-            CachedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-            Compress: true
-            ForwardedValues:
-              QueryString: true
-              Headers:
-                - "*"
-              Cookies:
-                Forward: all
-        Enabled: true
+
         Origins:
           - Id: S3Origin
             DomainName:
@@ -176,12 +116,12 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: ""
           - Id: ALBOrigin
-            DomainName:
-              Fn::ImportValue: !Sub "${EnvId}-ALBDNSName"
+            DomainName: !Ref ApiDomainName
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
-              OriginProtocolPolicy: http-only
+              OriginProtocolPolicy: https-only
+
         ViewerCertificate:
           AcmCertificateArn: !Ref CertificateArn
           SslSupportMethod: sni-only

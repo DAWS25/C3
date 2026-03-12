@@ -8,6 +8,7 @@ echo "Script[$0] started"
 TENANT_ID=${TENANT_ID:-"c3"}
 DOMAIN_PARENT=${DOMAIN_PARENT:-"daws25.com"}
 TENANT_DOMAIN=${TENANT_DOMAIN:-"$TENANT_ID.$DOMAIN_PARENT"}
+ECR_SCAN_ON_PUSH=${ECR_SCAN_ON_PUSH:-"true"}
 
 if [[ -z "$TENANT_DOMAIN" ]]; then
     echo "TENANT_DOMAIN is required"
@@ -101,19 +102,27 @@ REPOSITORY_NAME="c3-ubi"
 echo "Deploying ECR repository stack $TENANT_ID-ecr-$REPOSITORY_NAME"
 deploy_stack_safe "$TENANT_ID-ecr-$REPOSITORY_NAME" \
     --template-file c3-cform/tenant/ecr-repository.cform.yaml \
-    --parameter-overrides RepositoryName="$REPOSITORY_NAME"
+    --parameter-overrides RepositoryName="$REPOSITORY_NAME" ScanOnPush="$ECR_SCAN_ON_PUSH"
 
 REPOSITORY_NAME="c3-api"
 echo "Deploying ECR repository stack $TENANT_ID-ecr-$REPOSITORY_NAME"
 deploy_stack_safe "$TENANT_ID-ecr-$REPOSITORY_NAME" \
     --template-file c3-cform/tenant/ecr-repository.cform.yaml \
-    --parameter-overrides RepositoryName="$REPOSITORY_NAME"
+    --parameter-overrides RepositoryName="$REPOSITORY_NAME" ScanOnPush="$ECR_SCAN_ON_PUSH"
 
 VPC_STACK_NAME="$TENANT_ID-vpc-3ha-stack"
 echo "Deploying VPC stack $VPC_STACK_NAME"
 deploy_stack_safe "$VPC_STACK_NAME" \
     --template-file c3-cform/tenant/vpc-3ha.cform.yaml \
     --parameter-overrides TenantId="$TENANT_ID"
+
+EB_STACK_NAME="$TENANT_ID-eb-application-stack"
+EB_APPLICATION_NAME="$TENANT_ID-api-app"
+echo "Deploying Elastic Beanstalk application stack $EB_STACK_NAME"
+deploy_stack_safe "$EB_STACK_NAME" \
+    --template-file c3-cform/tenant/eb-application.yaml \
+    --parameter-overrides \
+        ApplicationName="$EB_APPLICATION_NAME"
 
 ##
 popd

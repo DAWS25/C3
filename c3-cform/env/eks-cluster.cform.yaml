@@ -26,10 +26,9 @@ Resources:
         Fn::ImportValue: !Sub '${TenantId}-VpcId'
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 10274
-          ToPort: 10274
-          SourceSecurityGroupId:
-            Fn::ImportValue: !Sub '${EnvId}-ALBSecurityGroupId'
+          FromPort: 15274
+          ToPort: 15274
+          CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -96,6 +95,7 @@ Resources:
 
   EKSFargateProfileKubeSystem:
     Type: AWS::EKS::FargateProfile
+    DependsOn: EKSFargateProfileDefault
     Properties:
       ClusterName: !Ref EKSCluster
       FargateProfileName: !Sub '${EnvId}-kube-system'

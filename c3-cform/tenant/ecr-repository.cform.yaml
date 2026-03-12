@@ -21,8 +21,17 @@ Parameters:
     Default: IMMUTABLE_WITH_EXCLUSION
     Description: Whether the repository is mutable 
 
+  ScanOnPush:
+    Type: String
+    Default: "true"
+    Description: Whether to enable vulnerability scan on push
+    AllowedValues:
+      - "true"
+      - "false"
+
 Conditions:
   IsEmptyOnDelete: !Equals [!Ref EmptyOnDelete, "true"]
+  IsScanOnPush: !Equals [!Ref ScanOnPush, "true"]
 
 Resources:
   Repository:
@@ -30,6 +39,8 @@ Resources:
     Properties:
       RepositoryName: !Ref RepositoryName
       EmptyOnDelete: !If [IsEmptyOnDelete, true, false]
+      ImageScanningConfiguration:
+        ScanOnPush: !If [IsScanOnPush, true, false]
       ImageTagMutability: !Ref Mutability
       #TODO: EncryptionConfiguration
       ImageTagMutabilityExclusionFilters:

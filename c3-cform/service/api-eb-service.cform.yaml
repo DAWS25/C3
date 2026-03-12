@@ -1,4 +1,4 @@
-Description: ALB routing for kapi service running on EKS
+Description: ALB routing for ebapi service running on Elastic Beanstalk
 
 Parameters:
   TenantId:
@@ -11,39 +11,39 @@ Parameters:
 
   ServiceName:
     Type: String
-    Default: kapi
+    Default: ebapi
 
   ContainerPort:
     Type: Number
-    Default: 15274
+    Default: 80
 
   PathPatterns:
     Type: CommaDelimitedList
-    Default: /kapi,/kapi/*
+    Default: /ebapi,/ebapi/*
 
   HealthCheckPath:
     Type: String
-    Default: /kapi/
+    Default: /ebapi/
 
   ListenerRulePriority:
     Type: Number
-    Default: 15274
+    Default: 11274
 
 Resources:
-  KapiTargetGroup:
+  EbapiTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Port: !Ref ContainerPort
       Protocol: HTTP
-      TargetType: ip
+      TargetType: instance
       VpcId:
         Fn::ImportValue: !Sub '${TenantId}-VpcId'
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
       Matcher:
-        HttpCode: '200'
+        HttpCode: '200-399'
 
-  KapiHttpsListenerRule:
+  EbapiHttpsListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       ListenerArn:
@@ -54,11 +54,11 @@ Resources:
           Values: !Ref PathPatterns
       Actions:
         - Type: forward
-          TargetGroupArn: !Ref KapiTargetGroup
+          TargetGroupArn: !Ref EbapiTargetGroup
 
 Outputs:
-  KapiTargetGroupArn:
-    Description: kapi target group arn
-    Value: !Ref KapiTargetGroup
+  EbapiTargetGroupArn:
+    Description: ebapi target group arn
+    Value: !Ref EbapiTargetGroup
     Export:
       Name: !Sub '${EnvId}-${ServiceName}TargetGroupArn'

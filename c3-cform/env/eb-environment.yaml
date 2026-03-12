@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Elastic Beanstalk environment
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Description: Elastic Beanstalk application name
+
+  EnvironmentName:
+    Type: String
+    Description: Elastic Beanstalk environment name
+
+  PlatformArn:
+    Type: String
+    Description: Elastic Beanstalk platform ARN
+
+  HostedZoneName:
+    Type: String
+    Description: Existing Route53 hosted zone name, without trailing dot
+
+  TenantId:
+    Type: String
+    Description: Tenant identifier
+
+  EnvId:
+    Type: String
+    Description: Environment identifier
+
+  C3Version:
+    Type: String
+    Default: latest
+    Description: Build version exposed to the application as C3_VERSION
+
+  InstanceType:
+    Type: String
+    Default: t3.small
+
+  EnvironmentType:
+    Type: String
+    Default: SingleInstance
+    AllowedValues:
+      - SingleInstance
+      - LoadBalanced
+
+  MinSize:
+    Type: Number
+    Default: 1
+
+  MaxSize:
+    Type: Number
+    Default: 1
+
+  ServiceRoleName:
+    Type: String
+    Default: aws-elasticbeanstalk-service-role
+
+  InstanceProfileName:
+    Type: String
+    Default: aws-elasticbeanstalk-ec2-role
+
+Resources:
+  ElasticBeanstalkEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName: !Ref ApplicationName
+      EnvironmentName: !Ref EnvironmentName
+      PlatformArn: !Ref PlatformArn
+      Tier:
+        Name: WebServer
+        Type: Standard
+      OptionSettings:
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: InstanceType
+          Value: !Ref InstanceType
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref InstanceProfileName
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: !Ref MinSize
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: !Ref MaxSize
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: !Ref EnvironmentType
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: !Ref ServiceRoleName
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: TENANT_ID
+          Value: !Ref TenantId
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: ENV_ID
+          Value: !Ref EnvId
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: C3_VERSION
+          Value: !Ref C3Version
+      Tags:
+        - Key: tenant-id
+          Value: !Ref TenantId
+        - Key: env-id
+          Value: !Ref EnvId
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  ElasticBeanstalkDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${HostedZoneName}.'
+      Name: !Sub '${TenantId}-${EnvId}.${HostedZoneName}.'
+      Type: CNAME
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt ElasticBeanstalkEnvironment.EndpointURL
+
+Outputs:
+  EnvironmentName:
+    Value: !Ref ElasticBeanstalkEnvironment
+
+  EndpointURL:
+    Value: !GetAtt ElasticBeanstalkEnvironment.EndpointURL
+
+  CustomDomainName:
+    Value: !Sub '${TenantId}-${EnvId}.${HostedZoneName}'

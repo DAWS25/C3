@@ -21,6 +21,7 @@ run_step() {
 
 run_step "Deploy services to ECS" "./scripts/services-deploy-ecs.sh"
 run_step "Deploy services to EKS" "./scripts/services-deploy-eks.sh"
+run_step "Deploy services to Elastic Beanstalk" "./scripts/services-deploy-eb.sh"
 
 popd >/dev/null
 echo "Script [$0] completed"

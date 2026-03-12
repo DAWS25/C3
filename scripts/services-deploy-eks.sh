@@ -15,18 +15,16 @@ AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account -
 C3_KAPI_REPOSITORY_URI=${C3_KAPI_REPOSITORY_URI:-"${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/c3-api"}
 C3_KAPI_IMAGE_VERSION=${C3_KAPI_IMAGE_VERSION:-"$(cat version.x.txt).$(cat version.y.txt).$(cat version.z.txt)"}
 C3_KAPI_IMAGE_URI=${C3_KAPI_IMAGE_URI:-"$C3_KAPI_REPOSITORY_URI:$C3_KAPI_IMAGE_VERSION"}
+C3_VERSION=${C3_VERSION:-"$C3_KAPI_IMAGE_VERSION"}
 
 C3_KAPI_STACK_NAME="$STACK_PREFIX-kapi-stack"
 C3_KAPI_SERVICE_NAME=${C3_KAPI_SERVICE_NAME:-"kapi"}
 C3_KAPI_NAMESPACE=${C3_KAPI_NAMESPACE:-"default"}
-C3_KAPI_CONTAINER_PORT=${C3_KAPI_CONTAINER_PORT:-"10274"}
+C3_KAPI_CONTAINER_PORT=${C3_KAPI_CONTAINER_PORT:-"15274"}
 C3_KAPI_REPLICAS=${C3_KAPI_REPLICAS:-"1"}
 C3_KAPI_PATH_PATTERNS=${C3_KAPI_PATH_PATTERNS:-"/kapi,/kapi/*"}
 C3_KAPI_HEALTH_CHECK_PATH=${C3_KAPI_HEALTH_CHECK_PATH:-"/kapi/"}
-C3_KAPI_HTTP_PATH=${C3_KAPI_HTTP_PATH:-"/"}
-C3_KAPI_REST_PATH=${C3_KAPI_REST_PATH:-"/kapi"}
-C3_KAPI_LISTENER_RULE_PRIORITY=${C3_KAPI_LISTENER_RULE_PRIORITY:-"2049"}
-C3_KAPI_INDEX_MESSAGE=${C3_KAPI_INDEX_MESSAGE:-"Welcome to C3 KAPI on EKS"}
+C3_KAPI_LISTENER_RULE_PRIORITY=${C3_KAPI_LISTENER_RULE_PRIORITY:-"15274"}
 C3_KAPI_EKS_CLUSTER_NAME=${C3_KAPI_EKS_CLUSTER_NAME:-"${ENV_ID}-eks-cluster"}
 KUBECONFIG_PATH=${KUBECONFIG_PATH:-"/tmp/${ENV_ID}-eks-kubeconfig"}
 
@@ -66,9 +64,8 @@ kubectl -n "$C3_KAPI_NAMESPACE" create deployment "$C3_KAPI_SERVICE_NAME" \
     --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n "$C3_KAPI_NAMESPACE" set env deployment/"$C3_KAPI_SERVICE_NAME" \
-    C3_INDEX_MESSAGE="$C3_KAPI_INDEX_MESSAGE" \
-    QUARKUS_HTTP_ROOT_PATH="$C3_KAPI_HTTP_PATH" \
-    QUARKUS_REST_PATH="$C3_KAPI_REST_PATH"
+    C3_VERSION="$C3_VERSION" \
+    QUARKUS_PROFILE="eks"
 
 kubectl -n "$C3_KAPI_NAMESPACE" create service clusterip "$C3_KAPI_SERVICE_NAME" \
     --tcp="$C3_KAPI_CONTAINER_PORT:$C3_KAPI_CONTAINER_PORT" \
@@ -76,10 +73,10 @@ kubectl -n "$C3_KAPI_NAMESPACE" create service clusterip "$C3_KAPI_SERVICE_NAME"
 
 kubectl -n "$C3_KAPI_NAMESPACE" rollout status deployment/"$C3_KAPI_SERVICE_NAME" --timeout=300s
 
-echo "Deploying kapi ALB routing stack: $C3_KAPI_STACK_NAME"
+echo "Deploying KAPI stack: $C3_KAPI_STACK_NAME"
 aws cloudformation deploy \
     --stack-name "$C3_KAPI_STACK_NAME" \
-    --template-file c3-cform/service/kapi-eks-alb-service.cform.yaml \
+    --template-file c3-cform/service/api-eks-service.cform.yaml \
     --parameter-overrides \
         TenantId="$TENANT_ID" \
         EnvId="$ENV_ID" \
@@ -139,6 +136,15 @@ for pod_ip in $POD_IPS; do
             --region "$AWS_REGION" \
             --group-id "$pod_sg" \
             --ip-permissions "IpProtocol=tcp,FromPort=$C3_KAPI_CONTAINER_PORT,ToPort=$C3_KAPI_CONTAINER_PORT,UserIdGroupPairs=[{GroupId=$ALB_SECURITY_GROUP_ID}]" \
+            >/dev/null 2>&1 || true
+
+        echo "Ensuring temporary public ingress on $pod_sg for tcp/$C3_KAPI_CONTAINER_PORT"
+        aws ec2 authorize-security-group-ingress \
+            --region "$AWS_REGION" \
+            --group-id "$pod_sg" \
+            --protocol tcp \
+            --port "$C3_KAPI_CONTAINER_PORT" \
+            --cidr 0.0.0.0/0 \
             >/dev/null 2>&1 || true
     done
 done

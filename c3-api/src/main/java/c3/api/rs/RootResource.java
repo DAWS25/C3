@@ -10,9 +10,11 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 
-@Path("")
+@Path("{any: .*}")
 public class RootResource {
     @Inject
     C3Config config;
@@ -30,8 +32,14 @@ public class RootResource {
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     @NoCache
-    public String get() {
-        var message = "C3 API v[" + config.version() + "] \n" + config.indexMessage();
+    public String get(@Context UriInfo uriInfo) {
+        var message = "C3 API"
+            + "root[" + httpPath + "] \n"
+            +" rest[" + restPath + "] \n"
+            +" path[" + uriInfo.getPath() + "] \n"
+            +" v[" + config.version() + "] \n" 
+            + config.indexMessage()
+            + "\n";
         return message;
     }
 }

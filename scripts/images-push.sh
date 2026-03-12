@@ -23,6 +23,7 @@ fi
 
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_REGION=$(aws configure get region)
+REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 echo "Authenticating to ECR Registry for account[$AWS_ACCOUNT_ID] and region[$AWS_REGION]"
 aws ecr get-login-password --region $AWS_REGION | $DOCKER_CMD login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
@@ -35,14 +36,23 @@ ecr_tag_exists() {
         --region "$AWS_REGION" >/dev/null 2>&1
 }
 
-echo "Bulding images"
+echo "Building images"
 VERSION_XARGS="--build-arg BUILD_VERSION=${BUILD_VERSION} --build-arg UBI_VERSION=${UBI_VERSION}"
 BUILD_XARGS="--no-cache --progress=plain $VERSION_XARGS" # DEBUG ARGUMENTS
 # BUILD_XARGS="$VERSION_XARGS" # REGULAR ARGUMENTS
 
 echo "Building C3 UBI image"
 C3_UBI_TAG="c3-ubi:$UBI_VERSION"
-$DOCKER_CMD build $BUILD_XARGS -f c3-ubi/Containerfile -t $C3_UBI_TAG . 
+if ecr_tag_exists "c3-ubi" "$UBI_VERSION"; then
+    echo "ECR image exists: $C3_UBI_TAG; pulling instead of building"
+    $DOCKER_CMD pull "$REGISTRY_URI/$C3_UBI_TAG"
+    $DOCKER_CMD tag "$REGISTRY_URI/$C3_UBI_TAG" "$C3_UBI_TAG"
+elif $DOCKER_CMD image inspect $C3_UBI_TAG >/dev/null 2>&1; then
+    echo "Image $C3_UBI_TAG already exists locally"
+    $DOCKER_CMD image inspect $C3_UBI_TAG
+else
+    $DOCKER_CMD build $BUILD_XARGS -f c3-ubi/Containerfile -t $C3_UBI_TAG .
+fi
 
 echo "Building C3 build image"
 C3_BUILD_TAG="c3-build:$BUILD_VERSION"
@@ -55,7 +65,6 @@ $DOCKER_CMD build $BUILD_XARGS -f c3-api/Containerfile -t $C3_API_TAG .
 SKIP_PUSH=${SKIP_PUSH:-"false"}
 if [ "$SKIP_PUSH" == "false" ]; then
     echo "Pushing images"
-    export REGISTRY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     if ecr_tag_exists "c3-ubi" "$UBI_VERSION"; then
         echo "ECR tag already exists and is immutable: c3-ubi:$UBI_VERSION; skipping push"
     else
@@ -73,7 +82,7 @@ fi
 
 echo "$VERSION_Z" > version.z.txt
 
-echo "Build and push images completed for version $VERSION"
+echo "Build and push images completed for version $BUILD_VERSION"
 echo "# Check the build image:"
 echo "docker run -it --rm $C3_BUILD_TAG bash"
 

@@ -13,6 +13,7 @@ DOMAIN_PARENT=${DOMAIN_PARENT:-"daws25.com"}
 TENANT_DOMAIN=${TENANT_DOMAIN:-"$TENANT_ID.$DOMAIN_PARENT"}
 ENV_DOMAIN="${ENV_ID}.${TENANT_DOMAIN}"
 DOMAIN_NAME=${DOMAIN_NAME:-"$ENV_DOMAIN"}
+API_DOMAIN_NAME=${API_DOMAIN_NAME:-"${ENV_ID}-api.${TENANT_DOMAIN}"}
 HOSTED_ZONE_ID=${HOSTED_ZONE_ID:-${ZONE_ID:-""}}
 
 stack_status() {
@@ -23,15 +24,40 @@ stack_status() {
         --output text 2>/dev/null || true
 }
 
-delete_stack_if_rollback_complete() {
+delete_stack_if_stale() {
     local stack_name="$1"
     local status
     status=$(stack_status "$stack_name")
-    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
-        echo "Deleting rollback-complete stack: $stack_name"
+    if [[ "$status" == "ROLLBACK_COMPLETE" || "$status" == "REVIEW_IN_PROGRESS" ]]; then
+        echo "Deleting stale stack [$status]: $stack_name"
         aws cloudformation delete-stack --stack-name "$stack_name"
         aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
     fi
+}
+
+print_failed_changeset_reason() {
+    local stack_name="$1"
+    local failed_change_set
+    local reason
+
+    failed_change_set=$(aws cloudformation list-change-sets \
+        --stack-name "$stack_name" \
+        --query "reverse(sort_by(Summaries[?Status=='FAILED'], &CreationTime))[0].ChangeSetName" \
+        --output text 2>/dev/null || true)
+
+    if [[ -z "$failed_change_set" || "$failed_change_set" == "None" ]]; then
+        echo "No failed change set found for stack: $stack_name"
+        return
+    fi
+
+    reason=$(aws cloudformation describe-change-set \
+        --stack-name "$stack_name" \
+        --change-set-name "$failed_change_set" \
+        --query "StatusReason" \
+        --output text 2>/dev/null || true)
+
+    echo "Failed change set: $failed_change_set"
+    echo "Validation message: ${reason:-Unavailable}"
 }
 
 if [[ -z "$DOMAIN_NAME" ]]; then
@@ -68,26 +94,35 @@ fi
 
 DISTRIBUTION_STACK_NAME="$STACK_PREFIX-web-distribution-stack"
 DISTRIBUTION_DNS_ALIAS_STACK_NAME="$STACK_PREFIX-web-distribution-dns-alias-stack"
-delete_stack_if_rollback_complete "$DISTRIBUTION_STACK_NAME"
-delete_stack_if_rollback_complete "$DISTRIBUTION_DNS_ALIAS_STACK_NAME"
+delete_stack_if_stale "$DISTRIBUTION_STACK_NAME"
+delete_stack_if_stale "$DISTRIBUTION_DNS_ALIAS_STACK_NAME"
 echo "## Deploying DISTRIBUTION stack..."
-aws cloudformation deploy \
+if ! aws cloudformation deploy \
     --stack-name "$DISTRIBUTION_STACK_NAME" \
     --template-file c3-cform/distribution/web-distribution.cform.yaml \
     --parameter-overrides \
         EnvId="$ENV_ID" \
         TenantId="$TENANT_ID" \
         DomainName="$DOMAIN_NAME" \
-        CertificateArn="$CERTIFICATE_ARN"
+        ApiDomainName="$API_DOMAIN_NAME" \
+        CertificateArn="$CERTIFICATE_ARN"; then
+    echo "Distribution deploy failed for stack: $DISTRIBUTION_STACK_NAME"
+    print_failed_changeset_reason "$DISTRIBUTION_STACK_NAME"
+    exit 1
+fi
 
 echo "## Deploying DISTRIBUTION DNS ALIAS stack..."
-aws cloudformation deploy \
+if ! aws cloudformation deploy \
     --stack-name "$DISTRIBUTION_DNS_ALIAS_STACK_NAME" \
     --template-file c3-cform/distribution/web-distribution-dns-alias.cform.yaml \
     --parameter-overrides \
         EnvId="$ENV_ID" \
         DomainName="$DOMAIN_NAME" \
-        HostedZoneId="$HOSTED_ZONE_ID"
+        HostedZoneId="$HOSTED_ZONE_ID"; then
+    echo "Distribution DNS alias deploy failed for stack: $DISTRIBUTION_DNS_ALIAS_STACK_NAME"
+    print_failed_changeset_reason "$DISTRIBUTION_DNS_ALIAS_STACK_NAME"
+    exit 1
+fi
 
 echo "Script [$0] completed for ENV_ID=$ENV_ID and DOMAIN_NAME=$DOMAIN_NAME"
 #!

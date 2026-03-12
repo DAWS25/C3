@@ -9,6 +9,15 @@ Parameters:
     Type: String
     Default: project
 
+  ApiDomainName:
+    Type: String
+    Description: DNS record name to map to the API ALB endpoint.
+    AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$
+
+  HostedZoneId:
+    Type: String
+    Description: Route53 hosted zone ID where the API alias record is created.
+
   ServiceName:
     Type: String
     Default: c3-api
@@ -55,20 +64,40 @@ Parameters:
     Default: /api/
     Description: ALB target group health check path
 
-  QuarkusHttpPath:
-    Type: String
-    Default: /
-    Description: QUARKUS_HTTP_PATH for the API container
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+    Default: 30
+    Description: ECS service grace period before target health checks are enforced
 
-  QuarkusRestPath:
-    Type: String
-    Default: /api
-    Description: QUARKUS_REST_PATH for the API container
+  TargetHealthCheckIntervalSeconds:
+    Type: Number
+    Default: 15
+    Description: ALB target group health check interval in seconds
+
+  TargetHealthCheckTimeoutSeconds:
+    Type: Number
+    Default: 5
+    Description: ALB target group health check timeout in seconds
+
+  TargetHealthyThresholdCount:
+    Type: Number
+    Default: 2
+    Description: Consecutive successful health checks required to mark healthy
+
+  TargetUnhealthyThresholdCount:
+    Type: Number
+    Default: 2
+    Description: Consecutive failed health checks required to mark unhealthy
 
   ListenerRulePriority:
     Type: Number
-    Default: 2048
+    Default: 10274
     Description: ALB listener rule priority
+
+  C3Version:
+    Type: String
+    Default: latest
+    Description: Build version exposed to the container as C3_VERSION
 
   C3IndexMessage:
     Type: String
@@ -91,12 +120,10 @@ Resources:
         - Name: !Ref ServiceName
           Image: !Ref ContainerImageUri
           Environment:
-            - Name: C3_INDEX_MESSAGE
-              Value: !Ref C3IndexMessage
-            - Name: QUARKUS_HTTP_ROOT_PATH
-              Value: !Ref QuarkusHttpPath
-            - Name: QUARKUS_REST_PATH
-              Value: !Ref QuarkusRestPath
+            - Name: C3_VERSION
+              Value: !Ref C3Version
+            - Name: QUARKUS_PROFILE
+              Value: ecs
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -107,7 +134,7 @@ Resources:
                 Fn::ImportValue: !Sub "${EnvId}-AppLogGroupName"
               awslogs-create-group: "true"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
+              awslogs-stream-prefix: "c3-api"
 
   ECSAPISecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -119,8 +146,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
-          SourceSecurityGroupId:
-            Fn::ImportValue: !Sub "${EnvId}-ALBSecurityGroupId"
+          CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -135,7 +161,11 @@ Resources:
         Fn::ImportValue: !Sub "${EnvId}-ECSClusterName"
       LaunchType: FARGATE
       DesiredCount: !Ref DesiredCount
-      HealthCheckGracePeriodSeconds: 180
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       TaskDefinition: !Ref ECSAPITaskDefinition
       NetworkConfiguration:
         AwsvpcConfiguration:
@@ -164,10 +194,14 @@ Resources:
         Fn::ImportValue: !Sub "${TenantId}-VpcId"
       HealthCheckProtocol: HTTP
       HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckIntervalSeconds: !Ref TargetHealthCheckIntervalSeconds
+      HealthCheckTimeoutSeconds: !Ref TargetHealthCheckTimeoutSeconds
+      HealthyThresholdCount: !Ref TargetHealthyThresholdCount
+      UnhealthyThresholdCount: !Ref TargetUnhealthyThresholdCount
       Matcher:
         HttpCode: "200-399"
 
-  ECSListenerRule2048:
+  ECSListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       ListenerArn: 
@@ -180,18 +214,17 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ECSAPITargetGroup
 
-  ECSHttpListenerRule2048:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+  ApiDNSRecord:
+    Type: AWS::Route53::RecordSet
     Properties:
-      ListenerArn:
-        Fn::ImportValue: !Sub "${EnvId}-HttpListenerArn"
-      Priority: !Ref ListenerRulePriority
-      Conditions:
-        - Field: path-pattern
-          Values: !Ref PathPatterns
-      Actions:
-        - Type: forward
-          TargetGroupArn: !Ref ECSAPITargetGroup
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::ImportValue: !Sub "${EnvId}-ALBDNSName"
+        HostedZoneId:
+          Fn::ImportValue: !Sub "${EnvId}-ALBZoneId"
 
 Outputs:
   ECSAPITaskDefinitionRef:
@@ -199,3 +232,7 @@ Outputs:
     Value: !Ref ECSAPITaskDefinition
     Export:
       Name: !Sub "${EnvId}-${ServiceName}TaskDefinitionRef"
+
+  ApiAliasRecordName:
+    Description: API alias record DNS name
+    Value: !Ref ApiDomainName
