@@ -7,6 +7,12 @@ echo "script [$0] started"
 # Usage:
 #   BASE_URL=https://local.c3.daws25.com ./scripts/health-check.sh
 BASE_URL=${BASE_URL:-"http://127.0.0.1:10274"}
+LOCAL_URL="http://127.0.0.1:10274"
+BASE_URL=${BASE_URL:-"$LOCAL_URL"}
+# Try to get CloudFormation output, fallback to localhost
+if cf_output=$(aws cloudformation describe-stacks --stack-name web-distribution-dns-alias --query 'Stacks[0].Outputs[0].OutputValue' --output text 2>/dev/null); then
+	BASE_URL="https://${cf_output}"
+fi
 
 check_200() {
 	local path="$1"

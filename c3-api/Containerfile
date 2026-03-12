@@ -2,22 +2,19 @@ ARG BUILD_IMAGE="c3-build"
 ARG BUILD_VERSION="0.0.0"
 ARG RUNTIME_IMAGE="public.ecr.aws/amazonlinux/amazonlinux"
 ARG RUNTIME_VERSION="2023"
-ARG USERNAME="code"
+ARG USER_NAME="code"
 
 FROM ${BUILD_IMAGE}:${BUILD_VERSION} AS build
 
-
-
-
 FROM ${RUNTIME_IMAGE}:${RUNTIME_VERSION}
 
-ARG USERNAME="code"
+ARG USER_NAME="code"
 ARG USER_UID=1001
 ARG ARTIFACT_ID="c3-api"
 ARG EXPOSE_PORT="10274"
-ARG HOMEDIR="/home/${USERNAME}"
-ARG JAVA_HOME="${HOMEDIR}/jre"
-ARG APP_DIR="${HOMEDIR}/src/${ARTIFACT_ID}/target/quarkus-app"
+ARG USER_HOME="/home/${USER_NAME}"
+ARG JAVA_HOME="${USER_HOME}/jre"
+ARG APP_DIR="${USER_HOME}/src/${ARTIFACT_ID}/target/quarkus-app"
 
 COPY --from=build "${JAVA_HOME}" "${JAVA_HOME}"
 COPY --from=build "${APP_DIR}" "${APP_DIR}"
@@ -25,14 +22,14 @@ COPY --from=build "${APP_DIR}" "${APP_DIR}"
 EXPOSE ${EXPOSE_PORT}
 
 #Consider removing user shell
-RUN echo "$USERNAME:x:$USER_UID:$USER_UID:$USERNAME User:${HOMEDIR}:/bin/sh" >> /etc/passwd && \
-    echo "$USERNAME:x:$USER_UID:" >> /etc/group && \
-    mkdir -p /home/$USERNAME && \
-    chown -R $USER_UID:$USER_UID /home/$USERNAME
+RUN echo "$USER_NAME:x:$USER_UID:$USER_UID:$USER_NAME User:${USER_HOME}:/bin/sh" >> /etc/passwd && \
+    echo "$USER_NAME:x:$USER_UID:" >> /etc/group && \
+    mkdir -p $USER_HOME && \
+    chown -R $USER_UID:$USER_UID $USER_HOME
 
-USER ${USERNAME}
-ENV USERNAME=${USERNAME}
-ENV HOMEDIR=${HOMEDIR}
+USER ${USER_NAME}
+ENV USER_NAME=${USER_NAME}
+ENV USER_HOME=${USER_HOME}
 ENV ARTIFACT_ID=${ARTIFACT_ID}
 ENV JAVA_HOME="${JAVA_HOME}"
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
