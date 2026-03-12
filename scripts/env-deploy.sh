@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$DIR/functions.sh"
 pushd "$DIR/.."
 #!
 echo "Script [$0] started"
@@ -36,14 +37,6 @@ if [[ -z "$HOSTED_ZONE_ID" ]]; then
     echo "Resolved HostedZoneId from $R53_STACK_NAME"
 fi
 
-stack_status() {
-    local stack_name="$1"
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --query 'Stacks[0].StackStatus' \
-        --output text 2>/dev/null || true
-}
-
 wait_for_stack_ready() {
     local stack_name="$1"
     local status
@@ -54,17 +47,6 @@ wait_for_stack_ready() {
         sleep 20
         status=$(stack_status "$stack_name")
     done
-}
-
-delete_stack_if_rollback_complete() {
-    local stack_name="$1"
-    local status
-    status=$(stack_status "$stack_name")
-    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
-        echo "Deleting rollback-complete stack: $stack_name"
-        aws cloudformation delete-stack --stack-name "$stack_name"
-        aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
-    fi
 }
 
 deploy_stack_safe() {

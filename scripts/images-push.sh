@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 pushd "$DIR/.."
 echo "Script[$0] started"

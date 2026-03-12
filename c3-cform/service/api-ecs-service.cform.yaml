@@ -20,7 +20,7 @@ Parameters:
 
   ServiceName:
     Type: String
-    Default: c3-api
+    Default: api
 
   ContainerImageUri:
     Type: String
@@ -134,7 +134,7 @@ Resources:
                 Fn::ImportValue: !Sub "${EnvId}-AppLogGroupName"
               awslogs-create-group: "true"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "c3-api"
+              awslogs-stream-prefix: "api"
 
   ECSAPISecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -146,7 +146,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${EnvId}-ALBSecurityGroupId"
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$DIR/functions.sh"
 pushd "$DIR/.." >/dev/null
 
 echo "Script [$0] started"
@@ -32,39 +33,6 @@ if [[ -z "$AWS_REGION" || "$AWS_REGION" == "None" ]]; then
     echo "AWS region is not configured. Set AWS_REGION or run aws configure."
     exit 1
 fi
-
-stack_status() {
-    local stack_name="$1"
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --query 'Stacks[0].StackStatus' \
-        --output text 2>/dev/null || true
-}
-
-wait_for_stack_ready() {
-    local stack_name="$1"
-    local status
-    status=$(stack_status "$stack_name")
-
-    while [[ "$status" == *_IN_PROGRESS || "$status" == *_CLEANUP_IN_PROGRESS ]]; do
-        echo "Stack $stack_name is $status; waiting for it to stabilize..."
-        sleep 20
-        status=$(stack_status "$stack_name")
-    done
-
-    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
-        echo "Deleting rollback-complete stack: $stack_name"
-        aws cloudformation delete-stack --stack-name "$stack_name"
-        aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
-    fi
-}
-
-deploy_stack_safe() {
-    local stack_name="$1"
-    shift
-    wait_for_stack_ready "$stack_name"
-    aws cloudformation deploy --stack-name "$stack_name" "$@"
-}
 
 echo "Verifying image exists: $C3_API_IMAGE_URI"
 aws ecr describe-images \

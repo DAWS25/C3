@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$DIR/functions.sh"
 pushd "$DIR/.."
 #!
 echo "Script [$0] started"
@@ -15,14 +16,6 @@ ENV_DOMAIN="${ENV_ID}.${TENANT_DOMAIN}"
 DOMAIN_NAME=${DOMAIN_NAME:-"$ENV_DOMAIN"}
 API_DOMAIN_NAME=${API_DOMAIN_NAME:-"${ENV_ID}-api.${TENANT_DOMAIN}"}
 HOSTED_ZONE_ID=${HOSTED_ZONE_ID:-${ZONE_ID:-""}}
-
-stack_status() {
-    local stack_name="$1"
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --query 'Stacks[0].StackStatus' \
-        --output text 2>/dev/null || true
-}
 
 delete_stack_if_stale() {
     local stack_name="$1"

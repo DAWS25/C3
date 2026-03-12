@@ -27,6 +27,7 @@ C3_KAPI_HEALTH_CHECK_PATH=${C3_KAPI_HEALTH_CHECK_PATH:-"/kapi/"}
 C3_KAPI_LISTENER_RULE_PRIORITY=${C3_KAPI_LISTENER_RULE_PRIORITY:-"15274"}
 C3_KAPI_EKS_CLUSTER_NAME=${C3_KAPI_EKS_CLUSTER_NAME:-"${ENV_ID}-eks-cluster"}
 KUBECONFIG_PATH=${KUBECONFIG_PATH:-"/tmp/${ENV_ID}-eks-kubeconfig"}
+KAPI_ROLLOUT_TIMEOUT_SECONDS=${KAPI_ROLLOUT_TIMEOUT_SECONDS:-"300"}
 
 if ! command -v kubectl >/dev/null 2>&1; then
     echo "ERROR: kubectl is required to deploy kapi on EKS"
@@ -71,7 +72,7 @@ kubectl -n "$C3_KAPI_NAMESPACE" create service clusterip "$C3_KAPI_SERVICE_NAME"
     --tcp="$C3_KAPI_CONTAINER_PORT:$C3_KAPI_CONTAINER_PORT" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n "$C3_KAPI_NAMESPACE" rollout status deployment/"$C3_KAPI_SERVICE_NAME" --timeout=300s
+kubectl -n "$C3_KAPI_NAMESPACE" rollout status deployment/"$C3_KAPI_SERVICE_NAME" --timeout="${KAPI_ROLLOUT_TIMEOUT_SECONDS}s"
 
 echo "Deploying KAPI stack: $C3_KAPI_STACK_NAME"
 aws cloudformation deploy \

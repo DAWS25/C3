@@ -2,6 +2,7 @@
 set -euo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$DIR/functions.sh"
 pushd "$DIR/.." >/dev/null
 
 echo "Script [$0] started"
@@ -16,8 +17,8 @@ TENANT_DOMAIN=${TENANT_DOMAIN:-"${TENANT_ID}.${DOMAIN_PARENT}"}
 API_DOMAIN_NAME=${API_DOMAIN_NAME:-"${ENV_ID}-api.${TENANT_DOMAIN}"}
 HOSTED_ZONE_ID=${HOSTED_ZONE_ID:-${ZONE_ID:-""}}
 
-C3_API_STACK_NAME="$STACK_PREFIX-c3-api-stack"
-C3_API_SERVICE_NAME=${C3_API_SERVICE_NAME:-"c3-api"}
+C3_API_STACK_NAME="$STACK_PREFIX-api-stack"
+C3_API_SERVICE_NAME=${C3_API_SERVICE_NAME:-"api"}
 C3_API_CONTAINER_PORT=${C3_API_CONTAINER_PORT:-"10274"}
 C3_API_TASK_CPU=${C3_API_TASK_CPU:-"512"}
 C3_API_TASK_MEMORY=${C3_API_TASK_MEMORY:-"1024"}
@@ -37,32 +38,6 @@ C3_API_IMAGE_VERSION=${C3_API_IMAGE_VERSION:-"$(cat version.x.txt).$(cat version
 C3_API_IMAGE_URI=${C3_API_IMAGE_URI:-"$C3_API_REPOSITORY_URI:$C3_API_IMAGE_VERSION"}
 C3_VERSION=${C3_VERSION:-"$C3_API_IMAGE_VERSION"}
 C3_API_CFN_TIMEOUT_SECONDS=${C3_API_CFN_TIMEOUT_SECONDS:-"300"}
-
-stack_status() {
-    local stack_name="$1"
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --query 'Stacks[0].StackStatus' \
-        --output text 2>/dev/null || true
-}
-
-wait_for_stack_ready() {
-    local stack_name="$1"
-    local status
-    status=$(stack_status "$stack_name")
-
-    while [[ "$status" == *_IN_PROGRESS || "$status" == *_CLEANUP_IN_PROGRESS ]]; do
-        echo "Stack $stack_name is $status; waiting for it to stabilize..."
-        sleep 20
-        status=$(stack_status "$stack_name")
-    done
-
-    if [[ "$status" == "ROLLBACK_COMPLETE" ]]; then
-        echo "Deleting rollback-complete stack: $stack_name"
-        aws cloudformation delete-stack --stack-name "$stack_name"
-        aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
-    fi
-}
 
 deploy_stack_safe() {
     local stack_name="$1"
