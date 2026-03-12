@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
+# Returns success if the given CloudFormation stack exists.
+# Args: $1 = stack name
 stack_exists() {
     local stack_name="$1"
     aws cloudformation describe-stacks --stack-name "$stack_name" >/dev/null 2>&1
 }
 
+# Prints the current CloudFormation stack status.
+# Args: $1 = stack name
 stack_status() {
     local stack_name="$1"
     aws cloudformation describe-stacks \
@@ -13,6 +17,8 @@ stack_status() {
         --output text 2>/dev/null || true
 }
 
+# Waits for stack deletion to complete with timeout and polling.
+# Args: $1 = stack name, $2 = timeout seconds, $3 = poll interval seconds
 wait_for_stack_delete_with_timeout() {
     local stack_name="$1"
     local timeout_seconds="$2"
@@ -40,6 +46,9 @@ wait_for_stack_delete_with_timeout() {
     done
 }
 
+# Waits until a stack is no longer in an in-progress state.
+# Deletes the stack first if it is stuck in ROLLBACK_COMPLETE.
+# Args: $1 = stack name, $2 = poll interval seconds (optional, default 20)
 wait_for_stack_ready() {
     local stack_name="$1"
     local poll_seconds="${2:-20}"
@@ -60,6 +69,8 @@ wait_for_stack_ready() {
     fi
 }
 
+# Deletes the stack when it is in ROLLBACK_COMPLETE so it can be recreated.
+# Args: $1 = stack name
 delete_stack_if_rollback_complete() {
     local stack_name="$1"
     local status
@@ -72,6 +83,8 @@ delete_stack_if_rollback_complete() {
     fi
 }
 
+# Safely deploys a stack after ensuring it's in a stable state.
+# Args: $1 = stack name, remaining args = aws cloudformation deploy arguments
 deploy_stack_safe() {
     local stack_name="$1"
     shift

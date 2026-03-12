@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$DIR/functions.sh"
+source "$DIR/utils_aws.sh"
 pushd "$DIR/.." >/dev/null
 
 ENV_ID=${ENV_ID:-"local"}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$DIR/functions.sh"
+source "$DIR/utils_aws.sh"
 pushd "$DIR/.."
 #!
 echo "Script [$0] started"
