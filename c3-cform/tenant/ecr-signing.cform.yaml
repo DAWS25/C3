@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Shared AWS Signer profile for ECR image signing
+
+Parameters:
+  ProfileName:
+    Type: String
+    Description: Name of the shared AWS Signer profile
+    AllowedPattern: ^[0-9a-zA-Z_]{2,64}$
+    ConstraintDescription: Signer profile name must be 2-64 chars and contain only letters, numbers, and underscores
+
+Resources:
+  RepositorySigningProfile:
+    Type: AWS::Signer::SigningProfile
+    Properties:
+      ProfileName: !Ref ProfileName
+      PlatformId: Notation-OCI-SHA384-ECDSA
+
+Outputs:
+  SigningProfileName:
+    Description: AWS Signer profile name
+    Value: !Ref RepositorySigningProfile
+    Export:
+      Name: !Sub "${AWS::StackName}-SigningProfileName"
+
+  SigningProfileArn:
+    Description: AWS Signer profile ARN
+    Value: !GetAtt RepositorySigningProfile.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-SigningProfileArn"
+
+  ExampleNotationSignCommand:
+    Description: Example command to sign an image tag using notation and AWS Signer plugin
+    Value: !Sub "notation sign --plugin com.amazonaws.signer.notation.plugin --id ${RepositorySigningProfile.Arn} ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/<repository>:<tag>"

@@ -9,6 +9,14 @@ TENANT_ID=${TENANT_ID:-"c3"}
 DOMAIN_PARENT=${DOMAIN_PARENT:-"daws25.com"}
 TENANT_DOMAIN=${TENANT_DOMAIN:-"$TENANT_ID.$DOMAIN_PARENT"}
 ECR_SCAN_ON_PUSH=${ECR_SCAN_ON_PUSH:-"true"}
+ECR_SIGNING_ENABLED=${ECR_SIGNING_ENABLED:-"true"}
+ECR_SIGNING_STACK_NAME=${ECR_SIGNING_STACK_NAME:-"${TENANT_ID}-ecr-signing-stack"}
+ECR_SIGNING_PROFILE_NAME=${ECR_SIGNING_PROFILE_NAME:-"${TENANT_ID}_signing_profile"}
+ECR_SIGNING_PROFILE_NAME="${ECR_SIGNING_PROFILE_NAME//[^[:alnum:]_]/_}"
+ECR_SIGNING_PROFILE_NAME="${ECR_SIGNING_PROFILE_NAME:0:64}"
+if [[ ${#ECR_SIGNING_PROFILE_NAME} -lt 2 ]]; then
+    ECR_SIGNING_PROFILE_NAME="c3_signing_profile"
+fi
 
 if [[ -z "$TENANT_DOMAIN" ]]; then
     echo "TENANT_DOMAIN is required"
@@ -109,6 +117,15 @@ echo "Deploying ECR repository stack $TENANT_ID-ecr-$REPOSITORY_NAME"
 deploy_stack_safe "$TENANT_ID-ecr-$REPOSITORY_NAME" \
     --template-file c3-cform/tenant/ecr-repository.cform.yaml \
     --parameter-overrides RepositoryName="$REPOSITORY_NAME" ScanOnPush="$ECR_SCAN_ON_PUSH"
+
+if [[ "$ECR_SIGNING_ENABLED" == "true" ]]; then
+    echo "Deploying shared ECR signing profile stack $ECR_SIGNING_STACK_NAME"
+    echo "Using ECR signing profile name: $ECR_SIGNING_PROFILE_NAME"
+    deploy_stack_safe "$ECR_SIGNING_STACK_NAME" \
+        --template-file c3-cform/tenant/ecr-signing.cform.yaml \
+        --parameter-overrides \
+            ProfileName="$ECR_SIGNING_PROFILE_NAME"
+fi
 
 VPC_STACK_NAME="$TENANT_ID-vpc-3ha-stack"
 echo "Deploying VPC stack $VPC_STACK_NAME"

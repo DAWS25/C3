@@ -4,7 +4,8 @@
     "graalvm-ce@latest",
     "maven@latest",
     "quarkus@latest",
-    "gnumake@latest"
+    "gnumake@latest",
+    "notation@latest"
   ],
   "shell": {
     "init_hook": [

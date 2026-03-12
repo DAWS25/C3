@@ -42,6 +42,25 @@ Resources:
       ImageScanningConfiguration:
         ScanOnPush: !If [IsScanOnPush, true, false]
       ImageTagMutability: !Ref Mutability
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire images older than 365 days",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 365
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       #TODO: EncryptionConfiguration
       ImageTagMutabilityExclusionFilters:
         - ImageTagMutabilityExclusionFilterType: "WILDCARD"
