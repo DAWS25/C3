@@ -6,6 +6,12 @@ echo "script [$0] started"
 ##
 
 TENANT_ID=${TENANT_ID:-"c3"}
+TENANT_DESTROY_TIMEOUT_SECONDS=${TENANT_DESTROY_TIMEOUT_SECONDS:-3600}
+TENANT_DESTROY_POLL_SECONDS=${TENANT_DESTROY_POLL_SECONDS:-60}
+TENANT_DESTROY_START_EPOCH=$(date +%s)
+EB_APPLICATION_NAME=${EB_APPLICATION_NAME:-"${TENANT_ID}-api-app"}
+EB_TERMINATE_TIMEOUT_SECONDS=${EB_TERMINATE_TIMEOUT_SECONDS:-1800}
+EB_TERMINATE_POLL_SECONDS=${EB_TERMINATE_POLL_SECONDS:-15}
 
 cleanup_tenant_hosted_zone_records() {
     local zone_stack="${TENANT_ID}-r53-zone-stack"
@@ -54,10 +60,90 @@ cleanup_tenant_hosted_zone_records() {
         --change-batch "$delete_batch"
 }
 
+cleanup_elastic_beanstalk_application_versions() {
+    local app_name="$1"
+    local app_exists
+
+    app_exists=$(aws elasticbeanstalk describe-applications \
+        --application-names "$app_name" \
+        --query "Applications[0].ApplicationName" \
+        --output text 2>/dev/null || true)
+
+    if [[ -z "$app_exists" || "$app_exists" == "None" ]]; then
+        return
+    fi
+
+    echo "Cleaning Elastic Beanstalk application: $app_name"
+
+    local active_env_ids
+    active_env_ids=$(aws elasticbeanstalk describe-environments \
+        --application-name "$app_name" \
+        --no-include-deleted \
+        --query "Environments[?Status!='Terminated'].EnvironmentId" \
+        --output text 2>/dev/null || true)
+
+    if [[ -n "$active_env_ids" && "$active_env_ids" != "None" ]]; then
+        echo "Terminating Elastic Beanstalk environments: $active_env_ids"
+        for env_id in $active_env_ids; do
+            aws elasticbeanstalk terminate-environment \
+                --environment-id "$env_id" \
+                --terminate-resources >/dev/null || true
+        done
+
+        local terminate_start elapsed remaining_envs
+        terminate_start=$(date +%s)
+        while true; do
+            remaining_envs=$(aws elasticbeanstalk describe-environments \
+                --application-name "$app_name" \
+                --no-include-deleted \
+                --query "Environments[?Status!='Terminated'].EnvironmentId" \
+                --output text 2>/dev/null || true)
+
+            if [[ -z "$remaining_envs" || "$remaining_envs" == "None" ]]; then
+                break
+            fi
+
+            elapsed=$(( $(date +%s) - terminate_start ))
+            if (( elapsed >= EB_TERMINATE_TIMEOUT_SECONDS )); then
+                echo "ERROR: Timeout terminating Elastic Beanstalk environments for app $app_name"
+                echo "Still active environments: $remaining_envs"
+                return 1
+            fi
+
+            sleep "$EB_TERMINATE_POLL_SECONDS"
+        done
+    fi
+
+    local version_labels
+    version_labels=$(aws elasticbeanstalk describe-application-versions \
+        --application-name "$app_name" \
+        --query "ApplicationVersions[].VersionLabel" \
+        --output text 2>/dev/null || true)
+
+    if [[ -n "$version_labels" && "$version_labels" != "None" ]]; then
+        echo "Deleting Elastic Beanstalk application versions for $app_name"
+        for version_label in $version_labels; do
+            aws elasticbeanstalk delete-application-version \
+                --application-name "$app_name" \
+                --version-label "$version_label" \
+                --delete-source-bundle >/dev/null || true
+        done
+    fi
+}
+
 # Delete all stacks whose name starts with TENANT_ID in reverse order of creation.
 
 while true; do    
+    elapsed=$(( $(date +%s) - TENANT_DESTROY_START_EPOCH ))
+    if (( elapsed >= TENANT_DESTROY_TIMEOUT_SECONDS )); then
+        REMAINING_STACKS=$(aws cloudformation list-stacks --query "StackSummaries[?starts_with(StackName, '$TENANT_ID') && StackStatus!='DELETE_COMPLETE'].StackName" --output text || true)
+        echo "ERROR: Tenant destroy timed out after ${TENANT_DESTROY_TIMEOUT_SECONDS}s"
+        echo "Remaining stacks: ${REMAINING_STACKS:-none}"
+        exit 1
+    fi
+
     cleanup_tenant_hosted_zone_records
+    cleanup_elastic_beanstalk_application_versions "$EB_APPLICATION_NAME"
 
     BUCKETS=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '$TENANT_ID')].Name" --output text)
     if [ -n "$BUCKETS" ]; then
@@ -79,7 +165,7 @@ while true; do
         aws cloudformation delete-stack --stack-name "$STACK"
     done
     echo "Waiting for stacks to be deleted..."
-    sleep 60
+    sleep "$TENANT_DESTROY_POLL_SECONDS"
 done
 popd
 echo "script [$0] completed"

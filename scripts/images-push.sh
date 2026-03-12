@@ -7,6 +7,8 @@ echo "Script[$0] started"
 
 # Ensure notation is available in PATH if installed locally
 export PATH="${HOME}/.local/bin:${PATH}"
+# Disable BuildKit to force Docker format (not OCI) for ECR scanning compatibility
+export DOCKER_BUILDKIT=0
 
 DOCKER_CMD=${DOCKER_CMD:-"docker"}
 TENANT_ID=${TENANT_ID:-"c3"}
@@ -81,8 +83,12 @@ sign_image_if_enabled() {
 
 echo "Building images"
 VERSION_XARGS="--build-arg BUILD_VERSION=${BUILD_VERSION} --build-arg UBI_VERSION=${UBI_VERSION}"
-# Use Docker format (not OCI) for ECR scanning compatibility
-BUILD_XARGS="--no-cache --progress=plain --output type=docker $VERSION_XARGS" # DEBUG ARGUMENTS
+# Classic builder (DOCKER_BUILDKIT=0) doesn't support --progress; use conditional
+if [[ "$DOCKER_BUILDKIT" == "1" ]] || [[ -z "$DOCKER_BUILDKIT" ]]; then
+    BUILD_XARGS="--no-cache --progress=plain $VERSION_XARGS" # BuildKit format
+else
+    BUILD_XARGS="--no-cache $VERSION_XARGS" # Classic builder (Docker format)
+fi
 # BUILD_XARGS="$VERSION_XARGS" # REGULAR ARGUMENTS
 
 echo "Building C3 UBI image"

@@ -7,6 +7,8 @@ pushd "$DIR/.." >/dev/null
 ENV_ID=${ENV_ID:-"local"}
 TENANT_ID=${TENANT_ID:-"c3"}
 STACK_PREFIX="${TENANT_ID}-${ENV_ID}"
+DELETE_STACK_TIMEOUT_SECONDS=${DELETE_STACK_TIMEOUT_SECONDS:-1800}
+DELETE_STACK_POLL_SECONDS=${DELETE_STACK_POLL_SECONDS:-15}
 
 ALB_SERVICES_STACK="$STACK_PREFIX-alb-services-stack"
 EKS_CLUSTER_STACK="$STACK_PREFIX-eks-cluster-stack"
@@ -20,12 +22,39 @@ stack_exists() {
 	aws cloudformation describe-stacks --stack-name "$stack_name" >/dev/null 2>&1
 }
 
+wait_for_stack_delete_with_timeout() {
+	local stack_name="$1"
+	local timeout_seconds="$2"
+	local poll_seconds="$3"
+	local start_epoch elapsed status
+
+	start_epoch=$(date +%s)
+	while true; do
+		if ! stack_exists "$stack_name"; then
+			return 0
+		fi
+
+		status=$(aws cloudformation describe-stacks --stack-name "$stack_name" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)
+		if [[ "$status" != "DELETE_IN_PROGRESS" ]]; then
+			echo "Stack $stack_name current status: $status"
+		fi
+
+		elapsed=$(( $(date +%s) - start_epoch ))
+		if (( elapsed >= timeout_seconds )); then
+			echo "ERROR: Timeout waiting for stack deletion: $stack_name (${timeout_seconds}s)"
+			return 1
+		fi
+
+		sleep "$poll_seconds"
+	done
+}
+
 delete_stack_if_exists() {
 	local stack_name="$1"
 	if stack_exists "$stack_name"; then
 		echo "Deleting stack: $stack_name"
 		aws cloudformation delete-stack --stack-name "$stack_name"
-		aws cloudformation wait stack-delete-complete --stack-name "$stack_name"
+		wait_for_stack_delete_with_timeout "$stack_name" "$DELETE_STACK_TIMEOUT_SECONDS" "$DELETE_STACK_POLL_SECONDS"
 		echo "Deleted stack: $stack_name"
 	else
 		echo "Skipping missing stack: $stack_name"
