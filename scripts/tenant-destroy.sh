@@ -6,6 +6,14 @@ echo "script [$0] started"
 ##
 
 TENANT_ID=${TENANT_ID:-"c3"}
+ECR_SIGNING_ENABLED=${ECR_SIGNING_ENABLED:-"true"}
+ECR_SIGNING_STACK_NAME=${ECR_SIGNING_STACK_NAME:-"${TENANT_ID}-ecr-signing-stack"}
+ECR_SIGNING_PROFILE_NAME=${ECR_SIGNING_PROFILE_NAME:-"${TENANT_ID}_signing"}
+ECR_SIGNING_PROFILE_NAME="${ECR_SIGNING_PROFILE_NAME//[^[:alnum:]_]/_}"
+ECR_SIGNING_PROFILE_NAME="${ECR_SIGNING_PROFILE_NAME:0:64}"
+if [[ ${#ECR_SIGNING_PROFILE_NAME} -lt 2 ]]; then
+    ECR_SIGNING_PROFILE_NAME="c3_signing_profile"
+fi
 TENANT_DESTROY_TIMEOUT_SECONDS=${TENANT_DESTROY_TIMEOUT_SECONDS:-3600}
 TENANT_DESTROY_POLL_SECONDS=${TENANT_DESTROY_POLL_SECONDS:-120}
 TENANT_DESTROY_START_EPOCH=$(date +%s)
@@ -131,12 +139,33 @@ cleanup_elastic_beanstalk_application_versions() {
     fi
 }
 
+verify_signing_profile_deleted() {
+    if [[ "$ECR_SIGNING_ENABLED" != "true" ]]; then
+        return
+    fi
+
+    echo "Verifying Signer profile deletion: $ECR_SIGNING_PROFILE_NAME"
+
+    local profile_name
+    profile_name=$(aws signer get-signing-profile \
+        --profile-name "$ECR_SIGNING_PROFILE_NAME" \
+        --query "profileName" \
+        --output text 2>/dev/null || true)
+
+    if [[ -n "$profile_name" && "$profile_name" != "None" ]]; then
+        echo "ERROR: Signer profile still exists after signer stack deletion: $ECR_SIGNING_PROFILE_NAME"
+        return 1
+    fi
+
+    echo "Signer profile not found: $ECR_SIGNING_PROFILE_NAME"
+}
+
 # Delete all stacks whose name starts with TENANT_ID in reverse order of creation.
 
 while true; do    
     elapsed=$(( $(date +%s) - TENANT_DESTROY_START_EPOCH ))
     if (( elapsed >= TENANT_DESTROY_TIMEOUT_SECONDS )); then
-        REMAINING_STACKS=$(aws cloudformation list-stacks --query "StackSummaries[?starts_with(StackName, '$TENANT_ID') && StackStatus!='DELETE_COMPLETE'].StackName" --output text || true)
+        REMAINING_STACKS=$(aws cloudformation list-stacks --query "StackSummaries[?(starts_with(StackName, '$TENANT_ID') || StackName=='$ECR_SIGNING_STACK_NAME') && StackStatus!='DELETE_COMPLETE'].StackName" --output text || true)
         echo "ERROR: Tenant destroy timed out after ${TENANT_DESTROY_TIMEOUT_SECONDS}s"
         echo "Remaining stacks: ${REMAINING_STACKS:-none}"
         exit 1
@@ -154,7 +183,7 @@ while true; do
         done
     fi
 
-    STACKS=$(aws cloudformation list-stacks --query "StackSummaries[?starts_with(StackName, '$TENANT_ID') && StackStatus!='DELETE_COMPLETE'].StackName" --output text | sort -r)
+    STACKS=$(aws cloudformation list-stacks --query "StackSummaries[?(starts_with(StackName, '$TENANT_ID') || StackName=='$ECR_SIGNING_STACK_NAME') && StackStatus!='DELETE_COMPLETE'].StackName" --output text | sort -r)
     if [[ -z "$STACKS" ]]; then
         echo "No stacks found, exiting"
         break
@@ -167,5 +196,8 @@ while true; do
     echo "Waiting for stacks to be deleted..."
     sleep "$TENANT_DESTROY_POLL_SECONDS"
 done
+
+verify_signing_profile_deleted
+
 popd
 echo "script [$0] completed"
